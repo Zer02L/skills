@@ -1,0 +1,20 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Temp and editor files
+*.tmp
+*.swp
+*~
+.vscode/
+.idea/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.venv/
+
+# skill-creator eval / workspace outputs
+*-workspace/
+evals/runs/
+.eval-cache/
