@@ -7,6 +7,7 @@ Load this reference while designing a new skill, squeezing token overhead out of
 - **Explain the *why*:** Tell the model why a rule exists (`"crossAlign has no 'stretch' mode in FigCraft; use sizingH: 'fill' on children so batch calls do not roll back"`) rather than spamming `ALWAYS`/`NEVER`.
 - **Use imperative instructions + one minimal working example:** One 10-line runnable snippet beats three abstract paragraphs.
 - **Avoid overfitting:** Do not hardcode specific test prompts or machine-specific home paths inside `SKILL.md` or bundled scripts. Skills should remain valid after being copied into `~/.skills-manager/skills/<name>/`.
+- **Spot repeated work across test runs (Repeated Work Detection):** Inspect transcripts of test executions. If agents independently write identical Python/bash one-liners, custom `curl`/`jq` wrappers, or repeated boilerplate, do not leave it to the agent's creativity — bundle that deterministic code into `scripts/` once.
 - **Keep `SKILL.md` lean:** Move full CLI flag tables, JSON schemas, and secondary setup flows (like MCP/GUI configuration) into `references/`. Keep `SKILL.md` focused on the primary path and hard pitfalls.
 
 ## 2. Optimizing CLI / sandboxed tools (`Probe -> Optimize -> Measure`)
@@ -38,3 +39,10 @@ Because cross-agent hooks run in both Python (`skill-hook-router.py`) and JavaSc
   - Trailing: `(?=$|[\s,.;:!?()'"/-])`
 - **Always provide an escape hatch for `deny_shell`:** Use `"allow_if_regex"` when a wrapper script legitimately wraps or cites the guarded command, and mention `SKIP_SKILL_HOOKS=1` in `"reason"`.
 - **Always add near-miss tests** in `evals/trigger-tests.json` and run `scripts/test-triggers.py <skill-dir> --live-router --js-check` before syncing hooks.
+
+## 4. Designing trigger queries and near-misses
+
+Whether tuning `description` or writing `evals/trigger-tests.json`:
+
+- **Realism over keywords:** Draft prompts with natural noise, conversational context, file paths, or typos (e.g., `"my boss sent me sales.xlsx and wants margin in col D"` instead of `"Format spreadsheet"`). Include cases where the user describes the intent without knowing the tool's exact name.
+- **Genuine near-misses over trivial negatives:** The most valuable `should_not_trigger` tests are adjacent tools or overlapping vocabulary (e.g. `manage-skills list` vs `skill-forge`, or `git commit` vs git-rebase tool). Avoid trivial negatives like `"Write a fibonacci function"` — they create false confidence without testing boundary discrimination.

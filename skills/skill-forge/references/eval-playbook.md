@@ -35,9 +35,14 @@ Store eval artifacts in `<skill-name>-workspace/` as a sibling directory of the 
    {"duration_ms": 12450, "total_tokens": 18200}
    ```
 
-## 3. Objective grading & optional blind comparison
+## 3. Objective grading vs subjective quality
 
-Draft verifiable assertions (not vague praise) and evaluate each run into `grading.json`:
+Never force artificial assertions onto subjective outcomes. Split verification by domain:
+
+- **Objective tasks (CLI, build, code transforms):** Check programmatically via scripts (`test_output.py`, `validate.py`). An assertion passes only when there is genuine substance, not superficial compliance (e.g. file exists AND has valid data).
+- **Subjective tasks (design taste, writing style, UX):** Evaluate qualitatively via human review or a Blind Comparator subagent.
+
+Evaluate each run into `grading.json`:
 
 ```json
 {
@@ -48,9 +53,51 @@ Draft verifiable assertions (not vague praise) and evaluate each run into `gradi
 }
 ```
 
-For subjective quality (design taste, prose clarity), optionally launch a blind comparator subagent: shuffle `with_skill` vs baseline outputs as **Response A** and **Response B** without revealing labels, and record which produced cleaner structure, fewer wasted steps, and better adherence to user constraints.
+## 4. Evaluator subagent prompt templates
 
-## 4. Aggregating results & static HTML review
+When automating grading or A/B reviews, spawn subagents with these lean prompt templates:
+
+### Grader prompt template
+```markdown
+Evaluate expectations against execution transcript and output files:
+- Expectations: <list of assertions>
+- Outputs dir: <path/to/outputs>
+- Transcript: <path/to/transcript.jsonl or log.md>
+
+Rules:
+1. PASS only when evidence demonstrates genuine task completion, not superficial compliance (e.g. right filename but empty content is a FAIL).
+2. Critique the evals: if an assertion passed trivially without doing the real work, or an important outcome is unverified, flag it under "critique".
+Save result to sibling grading.json: {"expectations": [{"text": "...", "passed": true|false, "evidence": "..."}], "eval_critique": []}
+```
+
+### Blind comparator prompt template (Subjective A/B)
+```markdown
+Compare two outputs without knowing which skill produced them.
+- Output A: <path/to/out_a>
+- Output B: <path/to/out_b>
+- Original Task: <prompt>
+
+Score both on 1-5 scale across two dimensions:
+- Content: Correctness, Completeness, Accuracy
+- Structure: Organization, Formatting, Usability
+Determine the winner (A or B) and save comparison.json:
+{"winner": "A"|"B", "reasoning": "...", "scores": {"A": {"content": N, "structure": N}, "B": {"content": N, "structure": N}}}
+```
+
+### Post-hoc analyzer prompt template
+```markdown
+Unblind comparison results to extract actionable skill improvements:
+- Winner: <"A" or "B">
+- Winner skill: <path> | Loser skill: <path>
+- Winner transcript: <path> | Loser transcript: <path>
+
+Analyze:
+1. Exactly where did the loser transcript diverge (unnecessary steps, missing tool/script, vague instruction)?
+2. Repeated work: did either side write ad-hoc helper scripts that should be bundled into scripts/?
+Save findings to analysis.json with prioritized suggestions for the loser skill.
+```
+
+## 5. Aggregating results & static HTML review
 
 Run `scripts/eval-summary.py` from the skill directory:
 
@@ -60,4 +107,7 @@ scripts/eval-summary.py <workspace>/iteration-1 \
   --html <workspace>/iteration-1/report.html
 ```
 
-This writes `benchmark.json`, `benchmark.md`, and a self-contained static `report.html` (no background HTTP server needed). Open `report.html` on Linux via `xdg-open` or inspect `benchmark.md` directly, then revise the skill based on failed assertions and observed transcript friction.
+This writes `benchmark.json`, `benchmark.md`, and an interactive standalone `report.html` (no HTTP server needed):
+- Inspect pass rates, duration, and token deltas across configurations.
+- Enter notes or per-card comments directly in the browser.
+- Click **"Copy Feedback for Agent"** to copy a Markdown summary straight to your clipboard for pasting into chat, or **"Download feedback.json"** for local file workflows.

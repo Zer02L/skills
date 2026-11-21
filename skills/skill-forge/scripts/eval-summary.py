@@ -156,8 +156,11 @@ def render_html(bench: dict[str, Any]) -> str:
         )
 
     eval_cards = []
+    card_index = 0
     for cfg, items in bench["configs"].items():
         for item in items:
+            card_index += 1
+            run_key = f"{item['eval_dir']}-{cfg}"
             ex_rows = []
             for ex in item["expectations"]:
                 mark = "PASS" if ex.get("passed") else "FAIL"
@@ -168,8 +171,14 @@ def render_html(bench: dict[str, Any]) -> str:
                     f"<div class='ev'>{html.escape(str(ex.get('evidence', '')))}</div></li>"
                 )
             eval_cards.append(
-                f"<div class='card'><h3>{html.escape(item['eval_name'])} — {html.escape(cfg)} "
-                f"({item['passed']}/{item['total']})</h3><ul>{''.join(ex_rows)}</ul></div>"
+                f"<div class='card' data-run-id='{html.escape(run_key)}' data-eval-name='{html.escape(item['eval_name'])}' data-cfg='{html.escape(cfg)}'>"
+                f"<h3>{html.escape(item['eval_name'])} — {html.escape(cfg)} ({item['passed']}/{item['total']})</h3>"
+                f"<ul>{''.join(ex_rows)}</ul>"
+                f"<div class='review-box'>"
+                f"<label for='fb-{card_index}'>Reviewer feedback:</label>"
+                f"<textarea id='fb-{card_index}' class='review-input' placeholder='Notes for this case (e.g. missing axis labels, superfluous tool calls)...'></textarea>"
+                f"</div>"
+                f"</div>"
             )
 
     return f"""<!DOCTYPE html>
@@ -178,7 +187,7 @@ def render_html(bench: dict[str, Any]) -> str:
 <meta charset="utf-8" />
 <title>Eval Report: {html.escape(bench['skill_name'])}</title>
 <style>
-  body {{ font-family: system-ui, sans-serif; margin: 24px auto; max-width: 960px; padding: 0 16px; color: #111827; background: #f9fafb; }}
+  body {{ font-family: system-ui, sans-serif; margin: 24px auto; max-width: 960px; padding: 0 16px 80px 16px; color: #111827; background: #f9fafb; }}
   h1 {{ font-size: 20px; margin-bottom: 12px; }}
   table {{ width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; margin-bottom: 20px; }}
   th, td {{ text-align: left; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }}
@@ -190,6 +199,17 @@ def render_html(bench: dict[str, Any]) -> str:
   .pass {{ background: #dcfce7; color: #166534; }}
   .fail {{ background: #fee2e2; color: #991b1b; }}
   .ev {{ color: #4b5563; font-size: 12.5px; margin-top: 2px; }}
+  .review-box {{ margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }}
+  .review-box label {{ font-size: 12px; font-weight: 600; color: #4b5563; display: block; margin-bottom: 4px; }}
+  .review-input, #overall-feedback {{ width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 48px; }}
+  .actions-panel {{ position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; padding: 12px 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.05); display: flex; gap: 12px; justify-content: center; align-items: center; z-index: 100; }}
+  .btn {{ font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }}
+  .btn-primary {{ background: #2563eb; color: #fff; }}
+  .btn-primary:hover {{ background: #1d4ed8; }}
+  .btn-secondary {{ background: #f3f4f6; color: #374151; border-color: #d1d5db; }}
+  .btn-secondary:hover {{ background: #e5e7eb; }}
+  .toast {{ font-size: 13px; color: #059669; font-weight: 600; margin-left: 8px; opacity: 0; transition: opacity 0.2s; }}
+  .toast.show {{ opacity: 1; }}
 </style>
 </head>
 <body>
@@ -199,6 +219,69 @@ def render_html(bench: dict[str, Any]) -> str:
     <tbody>{''.join(summary_rows)}</tbody>
   </table>
   {''.join(eval_cards)}
+
+  <div class='card' style='margin-bottom: 40px;'>
+    <h3>Overall Synthesis & Next Iteration Goals</h3>
+    <textarea id='overall-feedback' placeholder='General guidance for revising the skill in the next iteration...'></textarea>
+  </div>
+
+  <div class='actions-panel'>
+    <button class='btn btn-primary' id='copy-btn' onclick='copyFeedback()'>📋 Copy Feedback for Agent</button>
+    <button class='btn btn-secondary' id='dl-btn' onclick='downloadFeedback()'>💾 Download feedback.json</button>
+    <span class='toast' id='toast'>Copied to clipboard!</span>
+  </div>
+
+<script>
+const SKILL_NAME = {json.dumps(bench['skill_name'])};
+const ITERATION = {json.dumps(bench['iteration'])};
+
+function collectData() {{
+  const reviews = [];
+  document.querySelectorAll('.card[data-run-id]').forEach(card => {{
+    const runId = card.getAttribute('data-run-id');
+    const evalName = card.getAttribute('data-eval-name');
+    const cfg = card.getAttribute('data-cfg');
+    const text = (card.querySelector('.review-input')?.value || '').trim();
+    if (text) {{
+      reviews.push({{ run_id: runId, eval_name: evalName, config: cfg, feedback: text }});
+    }}
+  }});
+  const overall = (document.getElementById('overall-feedback')?.value || '').trim();
+  return {{ skill_name: SKILL_NAME, iteration: ITERATION, overall_feedback: overall, reviews: reviews }};
+}}
+
+function copyFeedback() {{
+  const data = collectData();
+  let md = `## Human Evaluation Feedback (${{data.skill_name}} - ${{data.iteration}})\\n\\n`;
+  if (data.overall_feedback) {{
+    md += `**Overall Direction:**\\n${{data.overall_feedback}}\\n\\n`;
+  }}
+  if (data.reviews.length > 0) {{
+    md += `### Per-Case Feedback:\\n`;
+    for (const r of data.reviews) {{
+      md += `- **${{r.eval_name}}** (${{r.config}}): ${{r.feedback}}\\n`;
+    }}
+  }} else {{
+    md += `*(No specific per-case complaints noted - outputs meet expectations)*\\n`;
+  }}
+  navigator.clipboard.writeText(md).then(() => {{
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }}).catch(err => alert('Could not copy: ' + err));
+}}
+
+function downloadFeedback() {{
+  const data = collectData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {{ type: 'application/json' }});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `feedback-${{data.skill_name}}-${{data.iteration}}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+</script>
 </body>
 </html>
 """
