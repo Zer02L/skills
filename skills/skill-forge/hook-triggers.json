@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "skill": "skill-forge",
+  "case_insensitive": true,
+  "prompt_regex": "\\bskill-forge\\b|\\bSKILL\\.md\\b|\\bhook-triggers\\.json\\b|\\b(?:create|write|build|author|design|optimi[sz]e|audit|improve|refactor|scaffold)\\b[^.\\n]{0,40}\\bskills?\\b|(?:^|[^\\wа-яёА-ЯЁ])(?:созда(?:й|ть|ни[ея])|напи(?:ши|сать)|сдела(?:й|ть)|спроектир(?:уй|овать)|оптимизир(?:уй|овать)|улучш(?:и|ить)|перепи(?:ши|сать)|передела(?:й|ть)|аудит|рефакторинг)[^.\\n]{0,35}скилл?(?:а|у|ом|е|ы|ов|ам|ами|ах)?(?=$|[\\s,.;:!?()'\"/-])",
+  "hint": "Use the `skill-forge` skill: read its SKILL.md first and use `scripts/audit-skill.py` and `scripts/test-triggers.py` during skill authoring and optimization.",
+  "deny_shell": []
+}

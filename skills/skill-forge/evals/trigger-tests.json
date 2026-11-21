@@ -1,0 +1,22 @@
+{
+  "prompts": [
+    {"query": "создай оптимизированный скилл для работы с docker compose", "should_trigger": true},
+    {"query": "напиши скил для ffmpeg чтобы экономить токены", "should_trigger": true},
+    {"query": "сделай аудит скилла и сократи его размер", "should_trigger": true},
+    {"query": "оптимизируй мой скилл под flatpak", "should_trigger": true},
+    {"query": "помоги спроектировать скилл с авто-хуком", "should_trigger": true},
+    {"query": "улучши SKILL.md чтобы модель не ошибалась в флагах", "should_trigger": true},
+    {"query": "проверь hook-triggers.json на ошибки", "should_trigger": true},
+    {"query": "create an optimized skill for kubectl", "should_trigger": true},
+    {"query": "audit and refactor this skill to cut token overhead", "should_trigger": true},
+    {"query": "покажи какие скилы у меня установлены в skills manager", "should_trigger": false},
+    {"query": "установи скил react-best-practices для claude code", "should_trigger": false},
+    {"query": "удали скил из библиотеки и обнови пресет", "should_trigger": false},
+    {"query": "почини баг в python скрипте парсинга csv", "should_trigger": false},
+    {"query": "list installed skills and deployed agents", "should_trigger": false},
+    {"query": "deploy existing skills to codex", "should_trigger": false},
+    {"query": "write a unit test for the authentication middleware", "should_trigger": false},
+    {"query": "как работает soft skills на собеседовании", "should_trigger": false}
+  ],
+  "shell": []
+}
