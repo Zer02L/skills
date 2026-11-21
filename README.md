@@ -13,11 +13,15 @@
 │       ├── references/         # (опционально) Справочные документы
 │       └── assets/             # (опционально) Шаблоны, ассеты
 ├── templates/
-│   └── skill-template/SKILL.md # Стартовый шаблон для новых скилов
+│   └── skill-template/
+│       ├── SKILL.md            # Стартовый шаблон для новых скилов
+│       └── hook-triggers.json  # Шаблон правил авто-хука (--with-hook)
 ├── scripts/
 │   ├── new-skill.sh            # Создать заготовку нового скила
-│   ├── validate.py             # Проверить формат, имена и ограничения
-│   └── sync-to-manager.sh      # Провалидировать и синхронизировать со Skills Manager
+│   ├── validate.py             # Проверить формат, имена, хуки и ограничения
+│   ├── sync-to-manager.sh      # Провалидировать и синхронизировать со Skills Manager
+│   ├── skill-hook-router.py    # Единый роутер хуков для всех агентов
+│   └── sync-hooks.py           # Установщик/проверка хуков в конфиги агентов
 ├── AGENTS.md                   # Правила для AI-агентов в этом репозитории
 └── CLAUDE.md -> AGENTS.md      # Симлинк для Claude Code
 ```
@@ -28,8 +32,8 @@
 
 ```bash
 ./scripts/new-skill.sh my-skill
-# При необходимости сразу создать подпапки:
-./scripts/new-skill.sh my-skill --with-scripts --with-references --with-assets
+# При необходимости сразу создать подпапки и шаблон авто-хука:
+./scripts/new-skill.sh my-skill --with-scripts --with-references --with-assets --with-hook
 ```
 
 ### 2. Написать `skills/my-skill/SKILL.md`
@@ -52,11 +56,28 @@
 # Установить/обновить в библиотеке Skills Manager и задеплоить агенту
 ./scripts/sync-to-manager.sh my-skill --deploy claude_code
 
-# Обновить сразу все скилы, задеплоить нескольким агентам и запушить бэкап
-./scripts/sync-to-manager.sh --all --deploy claude_code --deploy codex --backup
+# Обновить сразу все скилы, задеплоить нескольким агентам, обновить хуки и запушить бэкап
+./scripts/sync-to-manager.sh --all --deploy claude_code --deploy codex --hooks --backup
 ```
 
 > **Важно:** редактируйте свои скилы только здесь (`skills/<name>/`). Не правьте их копии внутри `~/.skills-manager/skills/<name>/` — при следующем `sync-to-manager.sh` / `skills update` правки там будут перезаписаны.
+
+## Универсальные хуки для автосрабатывания (`hook-triggers.json`)
+
+Если для скила нужно гарантированное срабатывание на промпт или блокировка неправильных CLI-команд, добавьте рядом с `SKILL.md` файл `hook-triggers.json` (или используйте `--with-hook` в `new-skill.sh`).
+
+- Проверить статус правил и агентов:
+  ```bash
+  ./scripts/sync-hooks.py --status
+  ```
+- Установить/обновить роутер во всех обнаруженных агентах (`antigravity`, `codex`, `claude_code`, `gemini_cli`, `opencode`):
+  ```bash
+  ./scripts/sync-hooks.py --dry-run   # предпросмотр
+  ./scripts/sync-hooks.py             # установка (существующие хуки сохраняются)
+  ./scripts/sync-hooks.py --uninstall # удалить только custom-skills-router
+  ```
+- Временно обойти shell-блокировку можно переменной окружения `SKIP_SKILL_HOOKS=1`.
+- Агенты без нативного API хуков (`deepseek_harness`, `omp_agent`, `command_code`, `pi`) срабатывают через поле `description` в `SKILL.md`.
 
 ## Какие ключи агентов доступны
 

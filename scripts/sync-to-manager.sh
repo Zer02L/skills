@@ -18,6 +18,7 @@ Options:
   --deploy <agent>          Deploy synced skill(s) to an agent (repeatable, e.g. --deploy claude_code)
   --backup                  Commit and push changes in Skills Manager's Git backup repo
   --backup-message <msg>    Commit message used with --backup (default: "sync custom skills")
+  --hooks                   Also run scripts/sync-hooks.py across detected hook-capable agents
   -h, --help                Show this help message
 EOF
 }
@@ -25,6 +26,7 @@ EOF
 DRY_RUN=0
 SYNC_ALL=0
 DO_BACKUP=0
+DO_HOOKS=0
 BACKUP_MSG="sync custom skills"
 DEPLOY_AGENTS=()
 RAW_TARGETS=()
@@ -49,6 +51,10 @@ while [ $# -gt 0 ]; do
       ;;
     --backup)
       DO_BACKUP=1
+      shift
+      ;;
+    --hooks)
+      DO_HOOKS=1
       shift
       ;;
     --backup-message)
@@ -371,3 +377,13 @@ def main() -> int:
 if __name__ == "__main__":
     sys.exit(main())
 PY
+
+if [ "$DO_HOOKS" -eq 1 ]; then
+  echo ""
+  echo "=== Syncing Universal Agent Hooks ==="
+  HOOK_ARGS=()
+  if [ "$DRY_RUN" -eq 1 ]; then
+    HOOK_ARGS+=(--dry-run)
+  fi
+  python3 "$SCRIPT_DIR/sync-hooks.py" "${HOOK_ARGS[@]}"
+fi

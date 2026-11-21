@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "skill": "__SKILL_NAME__",
+  "case_insensitive": true,
+  "prompt_regex": "\\b__SKILL_NAME__\\b",
+  "hint": "TODO: Short 1-line instruction telling the agent to read __SKILL_NAME__/SKILL.md and use its helper script.",
+  "deny_shell": []
+}

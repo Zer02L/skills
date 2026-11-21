@@ -7,9 +7,11 @@ Instructions for AI coding agents working in `/home/zerg/Projects/skills`.
 - `skills/<skill-name>/SKILL.md` — custom skills authored in this repo (one folder per skill, kebab-case matching `name:` in YAML frontmatter).
 - `skills/<skill-name>/scripts|references|assets/` — optional bundled resources for progressive disclosure.
 - `templates/skill-template/SKILL.md` — starter template (kept outside `skills/` so skill scanners skip it).
-- `scripts/new-skill.sh` — scaffold a new skill under `skills/<skill-name>/`.
-- `scripts/validate.py` — validate frontmatter, naming, structure, and size rules (pure Python 3 stdlib; PyYAML is optional).
-- `scripts/sync-to-manager.sh` — validate and install/update skills into Skills Manager (`~/.skills-manager/bin/skills-manager-cli`), optionally deploying to agents and pushing Git Backup.
+- `scripts/new-skill.sh` — scaffold a new skill under `skills/<skill-name>/` (pass `--with-hook` for starter `hook-triggers.json`).
+- `scripts/validate.py` — validate frontmatter, naming, structure, optional `hook-triggers.json`, and size rules (pure Python 3 stdlib; PyYAML is optional).
+- `scripts/sync-to-manager.sh` — validate and install/update skills into Skills Manager (`~/.skills-manager/bin/skills-manager-cli`), optionally deploying to agents (`--deploy`), syncing hooks (`--hooks`), and pushing Git Backup (`--backup`).
+- `scripts/skill-hook-router.py` — universal prompt/shell hook router reading `skills/*/hook-triggers.json`.
+- `scripts/sync-hooks.py` — idempotent installer for `antigravity`, `codex`, `claude_code`, `gemini_cli`, and `opencode` (`--status`, `--dry-run`, `--uninstall`).
 
 ## Authoring conventions
 

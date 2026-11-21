@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -25,6 +26,7 @@ ALLOWED_PROPERTIES = {
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 KEY_VALUE_RE = re.compile(r"^([A-Za-z0-9_.-]+)\s*:(?:\s+(.*)|\s*)$")
 BLOCK_HEADER_RE = re.compile(r"^([|>])([+-])?(\d+)?(?:\s+#.*)?$")
+INLINE_RE_FLAG = re.compile(r"\(\?(?:[aiLmsux]+(?:-[imsx]+)?|-[imsx]+)[):]")
 
 
 class FrontmatterParseError(ValueError):
@@ -594,6 +596,97 @@ def validate_skill_dir(skill_dir: Path) -> tuple[list[str], list[str]]:
 
     if line_count > 500:
         warnings.append(f"SKILL.md has {line_count} lines (recommended <= 500 lines)")
+
+    hook_file = skill_dir / "hook-triggers.json"
+    if hook_file.exists():
+        if not hook_file.is_file():
+            errors.append("hook-triggers.json must be a regular file")
+        else:
+            try:
+                hook_data = json.loads(hook_file.read_text(encoding="utf-8"))
+            except Exception as exc:
+                errors.append(f"Invalid JSON in hook-triggers.json: {exc}")
+                hook_data = None
+            if hook_data is not None:
+                if not isinstance(hook_data, dict):
+                    errors.append("hook-triggers.json must contain a JSON object")
+                else:
+                    sv = hook_data.get("schema_version")
+                    if not isinstance(sv, int) or isinstance(sv, bool) or sv != 1:
+                        errors.append("hook-triggers.json: 'schema_version' must be 1")
+                    enabled = hook_data.get("enabled")
+                    if not isinstance(enabled, bool):
+                        errors.append("hook-triggers.json: 'enabled' must be a boolean")
+                    hskill = hook_data.get("skill")
+                    if not isinstance(hskill, str) or hskill != skill_dir.name:
+                        errors.append(
+                            f"hook-triggers.json: 'skill' must match directory name '{skill_dir.name}'"
+                        )
+                    ci = hook_data.get("case_insensitive", True)
+                    if not isinstance(ci, bool):
+                        errors.append("hook-triggers.json: 'case_insensitive' must be a boolean")
+                    prompt_pat = hook_data.get("prompt_regex")
+                    if prompt_pat is not None:
+                        if not isinstance(prompt_pat, str):
+                            errors.append("hook-triggers.json: 'prompt_regex' must be a string")
+                        else:
+                            if INLINE_RE_FLAG.search(prompt_pat):
+                                errors.append(
+                                    "hook-triggers.json: 'prompt_regex' must not use inline flags like (?i); set 'case_insensitive' instead"
+                                )
+                            try:
+                                re.compile(prompt_pat)
+                            except re.error as exc:
+                                errors.append(
+                                    f"hook-triggers.json: invalid regex in 'prompt_regex': {exc}"
+                                )
+                    hint = hook_data.get("hint")
+                    if hint is not None:
+                        if not isinstance(hint, str):
+                            errors.append("hook-triggers.json: 'hint' must be a string")
+                        elif enabled is True and "TODO:" in hint:
+                            warnings.append(
+                                "hook-triggers.json: 'hint' still contains a TODO: placeholder while enabled"
+                            )
+                    deny_shell = hook_data.get("deny_shell")
+                    if deny_shell is not None:
+                        if not isinstance(deny_shell, list):
+                            errors.append("hook-triggers.json: 'deny_shell' must be a list")
+                        else:
+                            for idx, entry in enumerate(deny_shell):
+                                if not isinstance(entry, dict):
+                                    errors.append(
+                                        f"hook-triggers.json: deny_shell[{idx}] must be an object"
+                                    )
+                                    continue
+                                for rkey, required in (("regex", True), ("allow_if_regex", False)):
+                                    rval = entry.get(rkey)
+                                    if rval is None:
+                                        if required:
+                                            errors.append(
+                                                f"hook-triggers.json: deny_shell[{idx}].{rkey} is required"
+                                            )
+                                        continue
+                                    if not isinstance(rval, str) or (required and not rval):
+                                        errors.append(
+                                            f"hook-triggers.json: deny_shell[{idx}].{rkey} must be a non-empty string"
+                                        )
+                                        continue
+                                    if INLINE_RE_FLAG.search(rval):
+                                        errors.append(
+                                            f"hook-triggers.json: deny_shell[{idx}].{rkey} must not use inline flags; set 'case_insensitive' instead"
+                                        )
+                                    try:
+                                        re.compile(rval)
+                                    except re.error as exc:
+                                        errors.append(
+                                            f"hook-triggers.json: invalid regex in deny_shell[{idx}].{rkey}: {exc}"
+                                        )
+                                reason = entry.get("reason")
+                                if reason is not None and not isinstance(reason, str):
+                                    errors.append(
+                                        f"hook-triggers.json: deny_shell[{idx}].reason must be a string"
+                                    )
 
     return errors, warnings
 

@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEMPLATE_FILE="$REPO_ROOT/templates/skill-template/SKILL.md"
+HOOK_TEMPLATE_FILE="$REPO_ROOT/templates/skill-template/hook-triggers.json"
 SKILLS_DIR="$REPO_ROOT/skills"
 
 usage() {
@@ -16,6 +17,7 @@ Options:
   --with-scripts      Create an empty scripts/ subdirectory
   --with-references   Create an empty references/ subdirectory
   --with-assets       Create an empty assets/ subdirectory
+  --with-hook         Scaffold a starter hook-triggers.json (disabled by default)
   -h, --help          Show this help message
 EOF
 }
@@ -23,6 +25,7 @@ EOF
 WITH_SCRIPTS=0
 WITH_REFERENCES=0
 WITH_ASSETS=0
+WITH_HOOK=0
 SKILL_NAME=""
 
 while [ $# -gt 0 ]; do
@@ -37,6 +40,10 @@ while [ $# -gt 0 ]; do
       ;;
     --with-assets)
       WITH_ASSETS=1
+      shift
+      ;;
+    --with-hook)
+      WITH_HOOK=1
       shift
       ;;
     -h|--help)
@@ -109,6 +116,24 @@ skill_name = sys.argv[3]
 text = template_path.read_text(encoding="utf-8")
 dest_path.write_text(text.replace("__SKILL_NAME__", skill_name), encoding="utf-8")
 PY
+
+if [ "$WITH_HOOK" -eq 1 ]; then
+  if [ ! -f "$HOOK_TEMPLATE_FILE" ]; then
+    echo "Error: hook template file not found: $HOOK_TEMPLATE_FILE" >&2
+    exit 1
+  fi
+  python3 - "$HOOK_TEMPLATE_FILE" "$TARGET_DIR/hook-triggers.json" "$SKILL_NAME" <<'PY'
+import pathlib
+import sys
+
+template_path = pathlib.Path(sys.argv[1])
+dest_path = pathlib.Path(sys.argv[2])
+skill_name = sys.argv[3]
+
+text = template_path.read_text(encoding="utf-8")
+dest_path.write_text(text.replace("__SKILL_NAME__", skill_name), encoding="utf-8")
+PY
+fi
 
 echo "Created skill scaffold: $TARGET_DIR"
 echo "Next steps:"

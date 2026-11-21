@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "enabled": true,
+  "skill": "figcraft-flatpak",
+  "case_insensitive": true,
+  "prompt_regex": "\\bfigcraft(?:[-_]cli)?\\b|ai\\.storyteller\\.figcraft|\\.(?:figcraft|fig|penpot|sketch)\\b",
+  "hint": "Use the `figcraft-flatpak` skill: read its SKILL.md first and execute FigCraft operations via its `scripts/fc.sh` wrapper (auto-mounts Flatpak paths, defaults to `--no-system-fonts`, supports `$ref` batch scripts, and bounds command lookup).",
+  "deny_shell": [
+    {
+      "regex": "\\bflatpak\\s+run\\b[^\\n]*\\bai\\.storyteller\\.figcraft\\b",
+      "allow_if_regex": "\\bfc\\.sh\\b",
+      "reason": "Avoid raw `flatpak run ... ai.storyteller.figcraft`. Use `figcraft-flatpak/scripts/fc.sh` instead (auto-mounts Flatpak paths and sets `--no-system-fonts`). Set SKIP_SKILL_HOOKS=1 to bypass intentionally."
+    },
+    {
+      "regex": "\\bfigcraft-cli\\s+commands\\b(?![^|;&\\n]*--filter)",
+      "reason": "Do not dump all 645 FigCraft commands (~118 KB). Use `figcraft-flatpak/scripts/fc.sh lookup \"<query>\"` instead. Set SKIP_SKILL_HOOKS=1 to bypass intentionally."
+    }
+  ]
+}
