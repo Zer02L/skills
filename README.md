@@ -9,6 +9,7 @@
 | [`bottleneck-audit`](skills/bottleneck-audit) | Диагностика узких мест (CPU, DB/SQL, I/O, память, бандл/CI) по закону Амдала | `scan-hotspots.py`, `bench-cmd.py` | `enabled` |
 | [`figcraft-flatpak`](skills/figcraft-flatpak) | Работа с `.figcraft`/`.fig`/`.penpot`/`.sketch` через Flatpak FigCraft без расхода токенов на дамп команд | `fc.sh` | `enabled` (`deny_shell=2`) |
 | [`skill-forge`](skills/skill-forge) | Мета-скил для проектирования, аудита токен-бюджетов и A/B-бенчмаркинга скилов | `audit-skill.py`, `test-triggers.py`, `eval-summary.py` | `enabled` |
+| [`ui-craft`](skills/ui-craft) | Универсальный anti-slop дизайн-стандарт, ротатор структур и zero-Node линтер/контракт редизайна (`commercial` / `editorial` / `app`) | `ui-lint.py`, `ui-deal.py` | `enabled` |
 
 ## Структура
 

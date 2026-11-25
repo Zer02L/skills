@@ -327,5 +327,281 @@ class TestBenchCmd(unittest.TestCase):
             self.assertIn("speedup", res2["comparison"]["p50_ms"])
 
 
+class TestUiCraft(unittest.TestCase):
+    def test_standalone_lint_profiles_and_waivers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            copied = tmp_path / "ui-craft"
+            shutil.copytree(REPO_ROOT / "skills" / "ui-craft", copied)
+
+            ui_dir = tmp_path / "ui"
+            ui_dir.mkdir()
+            (ui_dir / "bundle.min.css").write_text(".a{color:#111;transition:all}", encoding="utf-8")
+            (ui_dir / "compiled.css").write_text(".x{" + ("color:#123456;" * 160) + "}", encoding="utf-8")
+            (ui_dir / "tokens.css").write_text(
+                ":root { --color-accent: #e65a40; }\n"
+                ".card { color: #ff0000; transition: all 200ms; }\n",
+                encoding="utf-8",
+            )
+            (ui_dir / "section.templ").write_text(
+                (
+                    "package sections\n\n"
+                    "templ Sample() {\n"
+                    '  <!-- transition-all from-indigo-500 to-purple-600 -->\n'
+                    "  // color: #ff0000 inside comment\n"
+                    '  <a href="https://example.com/ok" class="uppercase tracking-wider">Buy →</a>\n'
+                    '  <span class="rounded-full text-xs">Tag</span>\n'
+                    "  <h2>Title</h2>\n"
+                    '  <button class="p-4"><svg><path d="M0 0"/></svg></button>\n'
+                    '  <img src="/hero.jpg" loading="lazy" decoding="async" />\n'
+                    '  <!-- ui-craft-waive: RFX-CLR-RAW-GRAY (Legacy neutral surface kept during migration) -->\n'
+                    '  <div class="bg-gray-100 rounded-2xl p-6">Ok</div>\n'
+                    '  <!-- ui-craft-waive: RFX-LYT-CRAMPED-RADIUS (x) -->\n'
+                    '  <div class="rounded-3xl p-2">Tight</div>\n'
+                    '  <!-- ui-craft-waive: FLR-A11Y-IMG-ALT (Cannot waive floor) -->\n'
+                    '  <img src="/second.jpg" loading="lazy" decoding="async" />\n'
+                    "}\n"
+                ),
+                encoding="utf-8",
+            )
+            (ui_dir / "app_table.tsx").write_text(
+                (
+                    "export function Grid({ rows }: { rows: string[] }) {\n"
+                    '  return <table><thead><tr><th className="uppercase tracking-wider">Row</th></tr></thead>'
+                    "<tbody>{rows.map(r => <tr><td>{r}</td></tr>)}</tbody></table>;\n"
+                    "}\n"
+                ),
+                encoding="utf-8",
+            )
+
+            lint_py = copied / "scripts" / "ui-lint.py"
+            p_comm = subprocess.run(
+                [sys.executable, str(lint_py), "lint", str(ui_dir), "--profile", "commercial", "--json"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_comm.returncode, 1, msg=p_comm.stderr or p_comm.stdout)
+            r_comm = json.loads(p_comm.stdout)
+            self.assertEqual(len(r_comm["skipped_minified"]), 2)
+            comm_ids = {f["id"] for f in r_comm["findings"]}
+            self.assertIn("FLR-A11Y-ICON-BTN", comm_ids)
+            self.assertIn("FLR-A11Y-IMG-ALT", comm_ids)
+            self.assertIn("FLR-TOK-HEX-LITERAL", comm_ids)
+            self.assertIn("FLR-MOT-TRANSITION-ALL", comm_ids)
+            self.assertNotIn("FLR-CLR-SLOP-GRADIENT", comm_ids)
+            self.assertNotIn("RFX-ED-EYEBROW", comm_ids)
+            self.assertNotIn("RFX-ED-TRACKED-CAPS", comm_ids)
+            self.assertNotIn("RFX-ED-ARROW-DOT", comm_ids)
+
+            waived_gray = [f for f in r_comm["findings"] if f["id"] == "RFX-CLR-RAW-GRAY"]
+            self.assertTrue(waived_gray and waived_gray[0]["waived"])
+            bad_radius = [f for f in r_comm["findings"] if f["id"] == "RFX-LYT-CRAMPED-RADIUS"]
+            self.assertTrue(bad_radius and not bad_radius[0]["waived"] and "waiver_rejected" in bad_radius[0])
+            bad_floor_waive = [
+                f for f in r_comm["findings"]
+                if f["id"] == "FLR-A11Y-IMG-ALT" and f.get("waiver_rejected")
+            ]
+            self.assertTrue(bad_floor_waive and not bad_floor_waive[0]["waived"])
+
+            p_ed = subprocess.run(
+                [sys.executable, str(lint_py), "lint", str(ui_dir / "section.templ"), "--profile", "editorial", "--json"],
+                capture_output=True,
+                text=True,
+            )
+            ed_ids = {f["id"] for f in json.loads(p_ed.stdout)["findings"]}
+            self.assertIn("RFX-ED-EYEBROW", ed_ids)
+            self.assertIn("RFX-ED-TRACKED-CAPS", ed_ids)
+            self.assertIn("RFX-ED-ARROW-DOT", ed_ids)
+
+            p_app = subprocess.run(
+                [sys.executable, str(lint_py), "lint", str(ui_dir / "app_table.tsx"), "--profile", "app", "--json"],
+                capture_output=True,
+                text=True,
+            )
+            app_ids = {f["id"] for f in json.loads(p_app.stdout)["findings"]}
+            self.assertIn("RFX-ED-TRACKED-CAPS", app_ids)
+            self.assertIn("FIN-APP-STATES", app_ids)
+            self.assertIn("FIN-TYP-TABULAR", app_ids)
+
+    def test_standalone_snapshot_and_kept_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            copied = tmp_path / "ui-craft"
+            shutil.copytree(REPO_ROOT / "skills" / "ui-craft", copied)
+            lint_py = copied / "scripts" / "ui-lint.py"
+
+            page = tmp_path / "page.templ"
+            page.write_text(
+                (
+                    '<section data-component="hero-offer" data-source="ui/hero.templ">\n'
+                    '  <h1>Original Offer</h1>\n'
+                    '  <a href="/pricing">Pricing</a>\n'
+                    '  <form action="/api/lead" method="post">\n'
+                    '    <input type="email" name="email" x-model="email" />\n'
+                    '    <button hx-post="/api/book">Book</button>\n'
+                    '  </form>\n'
+                    '</section>\n'
+                ),
+                encoding="utf-8",
+            )
+            snap_file = tmp_path / ".ui-craft" / "before.json"
+            p_snap = subprocess.run(
+                [sys.executable, str(lint_py), "snapshot", str(page), "--out", str(snap_file)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_snap.returncode, 0, msg=p_snap.stderr or p_snap.stdout)
+
+            # Restyle preserving all wiring while changing heading copy
+            page.write_text(
+                (
+                    '<section class="grid gap-8" data-component="hero-offer" data-source="ui/hero.templ">\n'
+                    '  <h1>Sharper Offer</h1>\n'
+                    '  <a href="/pricing" class="underline">Pricing</a>\n'
+                    '  <form action="/api/lead" method="post">\n'
+                    '    <input type="email" name="email" x-model="email" />\n'
+                    '    <button hx-post="/api/book" class="bg-accent">Book</button>\n'
+                    '  </form>\n'
+                    '</section>\n'
+                ),
+                encoding="utf-8",
+            )
+            p_kept_ok = subprocess.run(
+                [sys.executable, str(lint_py), "kept", str(page), "--before", str(snap_file), "--json"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_kept_ok.returncode, 0, msg=p_kept_ok.stderr or p_kept_ok.stdout)
+            diff_ok = json.loads(p_kept_ok.stdout)
+            self.assertTrue(diff_ok["passed"])
+            self.assertEqual(diff_ok["heading_changes"]["removed"], ["h1:Original Offer"])
+
+            # Drop hx-post and test failure + --allow-drop recovery
+            page.write_text(
+                page.read_text(encoding="utf-8").replace(' hx-post="/api/book"', ""),
+                encoding="utf-8",
+            )
+            p_kept_fail = subprocess.run(
+                [sys.executable, str(lint_py), "kept", str(page), "--before", str(snap_file), "--json"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_kept_fail.returncode, 1)
+            diff_fail = json.loads(p_kept_fail.stdout)
+            self.assertFalse(diff_fail["passed"])
+            self.assertEqual(diff_fail["dropped"], [{"category": "htmx_endpoints", "item": "hx-post=/api/book"}])
+
+            p_kept_allow = subprocess.run(
+                [
+                    sys.executable,
+                    str(lint_py),
+                    "kept",
+                    str(page),
+                    "--before",
+                    str(snap_file),
+                    "--allow-drop",
+                    "hx-post=/api/book",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_kept_allow.returncode, 0, msg=p_kept_allow.stderr or p_kept_allow.stdout)
+
+    def test_standalone_preflight_and_deal_rotation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            copied = tmp_path / "ui-craft"
+            shutil.copytree(REPO_ROOT / "skills" / "ui-craft", copied)
+
+            proj = tmp_path / "proj"
+            (proj / "ui" / "assets").mkdir(parents=True)
+            (proj / "go.mod").write_text("module demo\nrequire github.com/a-h/templ v0.3.0\n", encoding="utf-8")
+            (proj / "DESIGN.md").write_text("# Design\n", encoding="utf-8")
+            (proj / "ui" / "assets" / "input.css").write_text(
+                '@import "tailwindcss";\n@theme {\n  --color-surface: var(--color-surface);\n}\n',
+                encoding="utf-8",
+            )
+            (proj / "ui" / "assets" / "tokens.css").write_text(
+                ":root {\n  --color-surface: #ffffff;\n  --color-accent: #e65a40;\n}\n",
+                encoding="utf-8",
+            )
+            (proj / "ui" / "assets" / "fonts.css").write_text(
+                "@font-face {\n  font-family: 'Inter';\n  src: url('/fonts/inter.woff2');\n}\n",
+                encoding="utf-8",
+            )
+            (proj / "ui" / "assets" / "styles.min.css").write_text(".a{color:red}", encoding="utf-8")
+            (proj / "ui" / "home.templ").write_text('<div x-data="{}" hx-get="/items">Hi</div>\n', encoding="utf-8")
+
+            lint_py = copied / "scripts" / "ui-lint.py"
+            p_pre = subprocess.run(
+                [sys.executable, str(lint_py), "preflight", str(proj), "--json"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(p_pre.returncode, 0, msg=p_pre.stderr or p_pre.stdout)
+            pre = json.loads(p_pre.stdout)
+            self.assertIn("Go Templ", pre["stacks"])
+            self.assertIn("Tailwind CSS v4", pre["stacks"])
+            self.assertIn("Alpine.js", pre["stacks"])
+            self.assertIn("HTMX", pre["stacks"])
+            self.assertEqual(pre["font_mode"], "self-hosted")
+            self.assertIn("DESIGN.md", pre["docs"])
+            token_names = {t["name"] for t in pre["tokens"]}
+            self.assertIn("--color-surface", token_names)
+            self.assertIn("--color-accent", token_names)
+            self.assertEqual(len(pre["skipped_minified"]), 1)
+
+            deal_py = copied / "scripts" / "ui-deal.py"
+            log_file = tmp_path / ".ui-craft" / "log.json"
+            seen_macros: list[str] = []
+            for idx in range(5):
+                p_deal = subprocess.run(
+                    [
+                        sys.executable,
+                        str(deal_py),
+                        "deal",
+                        "--profile",
+                        "commercial",
+                        "--material",
+                        "product",
+                        "--job",
+                        "buy",
+                        "--log",
+                        str(log_file),
+                        "--seed",
+                        str(100 + idx),
+                        "--json",
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(p_deal.returncode, 0, msg=p_deal.stderr or p_deal.stdout)
+                dealt = json.loads(p_deal.stdout)
+                macro_slug = dealt["macrostructure"]["slug"]
+                dir_slug = dealt["directions"][0]["slug"]
+                self.assertEqual(len(dealt["directions"]), 3)
+                seen_macros.append(macro_slug)
+
+                p_log = subprocess.run(
+                    [
+                        sys.executable,
+                        str(deal_py),
+                        "log",
+                        "--log",
+                        str(log_file),
+                        "--profile",
+                        "commercial",
+                        "--macrostructure",
+                        macro_slug,
+                        "--direction",
+                        dir_slug,
+                    ],
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(p_log.returncode, 0, msg=p_log.stderr or p_log.stdout)
+            self.assertGreater(len(set(seen_macros)), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,31 @@
+{
+  "prompts": [
+    {"query": "use ui-craft to audit src/ui/sections/", "should_trigger": true},
+    {"query": "design a commercial landing page for our SaaS billing product without AI slop", "should_trigger": true},
+    {"query": "redesign our pricing page and homepage while keeping all form handlers intact", "should_trigger": true},
+    {"query": "this dashboard looks AI-generated, audit the UI components and clean up the tokens", "should_trigger": true},
+    {"query": "build an admin panel table and filter UI in React + Tailwind with proper empty and loading states", "should_trigger": true},
+    {"query": "polish the hero section and remove anti-slop patterns from templates/hero.html", "should_trigger": true},
+    {"query": "сверстай коммерческий лендинг для сервиса доставки на Go Templ и Tailwind", "should_trigger": true},
+    {"query": "сделай редизайн главной страницы, чтобы не потерялись формы и ссылки", "should_trigger": true},
+    {"query": "проверь вёрстку в ui/sections/ на анти-слоп и соблюдение дизайн-токенов", "should_trigger": true},
+    {"query": "админка выглядит как типичный нейросетевой шаблон, сделай аудит интерфейса", "should_trigger": true},
+    {"query": "спроектируй дашборд с таблицами, фильтрами и состояниями загрузки/ошибки", "should_trigger": true},
+    {"query": "отполируй секцию каталога и убери ии-слоп из шаблона templ", "should_trigger": true},
+    {"query": "create a new landing page in editorial mode without eyebrow pills", "should_trigger": true},
+    {"query": "lint our storefront UI components for accessibility focus rings and hex literals", "should_trigger": true},
+    {"query": "Create a mobile login screen in figcraft and export preview.png", "should_trigger": false},
+    {"query": "конвертируй файл design/home.fig в svg через figcraft-cli", "should_trigger": false},
+    {"query": "improve the animations and spring physics on this modal sheet", "should_trigger": false},
+    {"query": "улучши плавность анимаций и spring-переходы в карточках меню", "should_trigger": false},
+    {"query": "реакт таблица жутко лагает и фризит при скролле, найди узкие места", "should_trigger": false},
+    {"query": "why is this SQL query so slow and causing N+1 queries on the orders endpoint?", "should_trigger": false},
+    {"query": "audit and refactor this SKILL.md to cut token overhead", "should_trigger": false},
+    {"query": "создай оптимизированный скилл для работы с docker compose", "should_trigger": false},
+    {"query": "build a faux product demo with an animated cursor clicking through tabs", "should_trigger": false},
+    {"query": "redesign the PostgreSQL database schema and REST API endpoints for invoices", "should_trigger": false},
+    {"query": "fix the Go backend handler returning 500 when JSON payload is empty", "should_trigger": false},
+    {"query": "deploy existing skills to codex via skills-manager-cli", "should_trigger": false}
+  ],
+  "shell": []
+}
