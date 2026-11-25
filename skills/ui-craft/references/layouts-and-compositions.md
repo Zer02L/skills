@@ -45,9 +45,23 @@ Mix 3–6 distinct compositions per page. Never place two identical section stru
 16. **Schedule (time slots/timeline):** `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3` or vertical agenda rows with `tabular-nums`.
 17. **Offer (decision anchor):** `max-w-4xl mx-auto p-8 rounded-card border border-content/15 bg-surface` combining real image/scope, exact price, primary CTA, and warranty/terms.
 
-## 3. Rhythm, Typography & Font Discipline
+## 3. Bento composition discipline (`commercial` / `editorial`)
+
+When using `bento-grid` (`app` dashboards should prefer uniform scannable tables and KPI strips instead):
+
+- **Mix tile kinds in checkerboard contrast:** Alternate hero UI/visual tiles, single isolated controls, verified stats/statements, and diagrams/collections — never pack identical feature cards side by side.
+- **Say each thing once:** Never repeat the same metric, user name, or UI chrome across multiple tiles in one grid.
+- **Anchor one focal tile:** Give interactive or visual emphasis to a single lead tile and keep neighboring tiles calm.
+- **Recompose natively at `390px`:** Stack or adjust tile grids for mobile widths instead of scaling down a desktop canvas.
+- **Faux-UI delegation:** If a hero or bento tile needs a miniature mocked product UI or animated cursor walkthrough, delegate that illustration to the `stageshow` skill while keeping page layout, tokens, and gating under `ui-craft`.
+
+## 4. Rhythm, Typography & Font Discipline
 
 - **Container & gutters:** Cap page content measure (`max-w-6xl` or `max-w-7xl mx-auto`), align vertical section edges consistently, and keep at least 35% of cards/bands visually distinct in density.
 - **Scale & alignment:** Body copy `>= 16px` (`text-base`), headings step cleanly (`h1` 1.8–3x body; avoid orphan 1-word italic highlights), and prefer left-aligned section headers over endless centered stacks.
 - **Cyrillic & Zero-CDN safety:** Check `preflight` font output before picking a typeface. When a repo uses self-hosted `.woff2` fonts (Zero-CDN) or serves Cyrillic content, stay on the repo's verified font stack (`font-sans` / `font-serif-title` / `font-mono`) rather than injecting unverified Latin-only Google Fonts or Fontshare links.
 - **Visual hierarchy:** One primary CTA style per viewport; reserve the accent color for primary actions, active selections, and `:focus-visible` rings.
+- **Concentric radii & even insets:** Keep `outerRadius = innerRadius + padding` on nested shapes, and carry container padding evenly around the bottom edge as well as top and sides.
+- **No wrapped units or squeezed icons:** Keep numeric values with units (`99.9%`, `14 ms`, `12 400 ₽`) on one line via `whitespace-nowrap`; add `shrink-0` on icons, avatars, and badges inside flex rows.
+- **Opaque layering & authentic marks:** Avoid stacking semi-transparent surfaces (`onion skin`); use the product's real mark or a clean typographic wordmark rather than an invented single-letter colored square (in `commercial`/`editorial`; workspace monograms remain fine in `app`).
+- **Restrained AI chrome:** Avoid decorative sparkle/wand icons or violet glow as generic AI ornament unless it is the product's own established icon.

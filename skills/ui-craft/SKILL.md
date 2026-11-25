@@ -27,7 +27,7 @@ Zero-dependency web UI standard that replaces conflicting style guides with **on
    - Run `python3 scripts/ui-lint.py lint <PATHS> --profile <p>` and fix all `FLOOR` and open `REFLEX` findings.
    - `FLOOR` rules never ship and cannot be waived. `REFLEX` findings may be suppressed with a concrete inline/header comment (`/* ui-craft-waive: RFX-... (reason) */`); `FINISH` checks guide craft and fail only under `--strict`.
    - On any redesign, run `python3 scripts/ui-lint.py kept <PATHS> --before .ui-craft/before.json` and fix unexpected drops (or document intentional removals via `--allow-drop`).
-5. **Fresh-Context Review & Log:** Run a blind subagent review (or cold self-audit if single-agent) using the checklist in `references/profiles-and-gates.md`, then log new builds via `python3 scripts/ui-deal.py log ...`.
+5. **Fresh-Context Review & Log:** Run a blind subagent review (or cold self-audit if single-agent) using the checklist in `references/profiles-and-gates.md` (and optionally run `assets/dom-audit.js` in a live preview/browser), then log new builds via `python3 scripts/ui-deal.py log ...`.
 
 ## 3. Universal Floor (never waived)
 
@@ -46,8 +46,9 @@ python3 scripts/ui-lint.py snapshot src/ui --out .ui-craft/before.json
 python3 scripts/ui-lint.py kept src/ui --before .ui-craft/before.json
 ```
 
-## 5. Progressive disclosure references
+## 5. Progressive disclosure references & assets
 
 - `references/profiles-and-gates.md` — full Floor/Reflex/Finish gate table, waiver syntax, 4 data + 8 control states, and blind review checklist.
 - `references/layouts-and-compositions.md` — 14 macrostructures, 17 section patterns (with Tailwind v4 semantic token grids), and typography/rhythm discipline.
 - `references/redesign-and-preflight.md` — pre-flight signal hierarchy, redesign depths (`polish` / `restyle` / `full`), and `snapshot`/`kept` contract guide.
+- `assets/dom-audit.js` — optional read-only browser DOM geometry snippet (`preview_evaluate` / Playwright) for overflow, clipped containers, squeezed icons, wrapped units, and broken images.

@@ -78,6 +78,23 @@ Rules: reasons must be at least 4 characters explaining *why*. Attempting to wai
 
 ## 5. Blind fresh-context review checklist
 
-When launching a fresh-context subagent (give only rendered markup/screenshots + brief, **never** the builder's excuses):
-1. **Hero / Shell pass:** Does the first viewport state what is offered, for whom, and show one real visual or control without clipping at 1280px and 390px?
-2. **Finish pass:** Check visual monotony (identical card rows), token consistency across light/dark bands, honest proof (zero invented metrics), keyboard focus visibility, and mobile stacking order.
+When launching a fresh-context subagent, pass only rendered markup/screenshots + the brief — **never** the builder's plan or excuses:
+
+1. **Pass 0 — Brief fit (anti-template test):** Does this layout answer *this* product and job, or could it be dropped onto any site in the category? Generic framing detached from the brief ranks as a high-severity finding even if `ui-lint.py` passes.
+2. **Hero / Shell & mobile pass:** Verify the first viewport states what is offered, for whom, and renders its primary visual or control cleanly at `1280px` and `390px` (plus dark theme if shipped).
+3. **Evidence & waiver discipline:**
+   - Every finding cites a concrete screenshot, DOM metric, or source line — **no predicted passes** and no predicted failures.
+   - Re-verify every `ui-craft-waive` independently; rank findings by user impact rather than ease of fixing, and never soften a broken breakpoint as "nearly there".
+4. **Two-layer verification (`static` vs `visual`):**
+   - **Static (always required):** `ui-lint.py lint` (plus `kept` on redesigns).
+   - **Visual (when a preview/browser exists):** Inspect `1280px` and `390px` (plus dark theme if shipped) and optionally evaluate `assets/dom-audit.js` via `preview_evaluate` or Playwright `page.evaluate`. Report `visual: not run` when no browser is available, or `visual: incomplete` if desktop was checked without `390px` (or shipped dark mode) — never `pass`.
+5. **Visual diagnosis ("You see → You do"):**
+
+| You see | You do |
+| --- | --- |
+| Horizontal scroll at `390px` (`horizontalOverflow`) | Replace rigid `w-[>360px]`/`100vw` with `max-w-full`, wrap tables in `overflow-x-auto`, keep `overflow-x: clip` on `html`/`body` |
+| Metric or price unit breaks onto a second line (`wrappedUnits`) | Add `whitespace-nowrap` on numeric+unit pairs or move the unit to the label above |
+| Icon or chip squishes next to flex text (`squeezed-icon`) | Add `shrink-0` (`flex-shrink: 0`) on icons, badges, and avatars inside flex rows |
+| Container bottom padding looks clipped (`container-block-inset`) | Remove conflicting fixed height / `overflow-y: hidden` on inner wrapper or carry bottom padding inside the scrollable/clipped frame |
+| Button/chip label hugs one edge (`control-edge-inset`) | Use symmetric padding or move trailing badge/icon into a separate container gap |
+| Broken image or unintentional empty pane void (`brokenImages`) | Fix asset path/fallback or fill the section cleanly instead of leaving hollow vertical space |

@@ -57,4 +57,4 @@ Report the concrete verification summary at the end of a build or redesign:
 - Active profile & scope (`commercial` / `editorial` / `app`).
 - Exact `ui-lint.py lint` line (`Floor X FAIL · Reflex Y (Z waived) · Finish W`), listing every waiver and its reason.
 - Exact `ui-lint.py kept` status on redesigns (including any `--allow-drop` items).
-- Any visual/browser checks not run (if no headless browser or visual preview was executed).
+- Visual verification status: `visual: verified (1280px, 390px[, dom-audit])`, `visual: incomplete (missing 390px/theme)`, or `visual: not run (no browser available)`.

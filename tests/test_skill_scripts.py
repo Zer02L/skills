@@ -602,6 +602,169 @@ class TestUiCraft(unittest.TestCase):
                 self.assertEqual(p_log.returncode, 0, msg=p_log.stderr or p_log.stdout)
             self.assertGreater(len(set(seen_macros)), 1)
 
+    def test_dom_audit_asset_is_self_contained_and_runs_under_node(self) -> None:
+        dom_audit = REPO_ROOT / "skills" / "ui-craft" / "assets" / "dom-audit.js"
+        self.assertTrue(dom_audit.is_file(), "assets/dom-audit.js must exist")
+        src = dom_audit.read_text(encoding="utf-8")
+        self.assertNotRegex(src, r"\b(?:import|export|require)\b")
+        self.assertNotIn(".ss-", src)
+        self.assertNotRegex(src, r"(?:/home/[A-Za-z0-9._-]+/|/Users/[A-Za-z0-9._-]+/)")
+
+        node_bin = shutil.which("node")
+        if not node_bin:
+            return
+
+        chk = subprocess.run([node_bin, "--check", str(dom_audit)], capture_output=True, text=True)
+        self.assertEqual(chk.returncode, 0, msg=chk.stderr or chk.stdout)
+
+        harness = r"""
+const fs = require('fs');
+const code = fs.readFileSync(process.argv[1], 'utf8');
+function runCase(mode) {
+  function makeEl(tag, opts = {}) {
+    return {
+      tagName: tag.toUpperCase(),
+      id: opts.id || '',
+      className: opts.className || '',
+      children: opts.children || [],
+      childNodes: opts.childNodes || [],
+      textContent: opts.textContent || '',
+      scrollWidth: opts.scrollWidth ?? 100,
+      clientWidth: opts.clientWidth ?? 100,
+      scrollHeight: opts.scrollHeight ?? 30,
+      clientHeight: opts.clientHeight ?? 30,
+      complete: opts.complete ?? true,
+      naturalWidth: opts.naturalWidth ?? 100,
+      parentElement: null,
+      _attrs: opts.attrs || {},
+      _rect: opts.rect || { left: 10, right: 110, top: 10, bottom: 40, width: 100, height: 30 },
+      _style: Object.assign({
+        display: 'block', visibility: 'visible', opacity: '1', position: 'static',
+        overflowX: 'visible', overflowY: 'visible', writingMode: 'horizontal-tb',
+        borderLeftWidth: '0px', borderRightWidth: '0px', borderTopWidth: '0px', borderBottomWidth: '0px',
+        paddingLeft: '8px', paddingRight: '8px', paddingBottom: '0px', width: '0px', height: '0px',
+        fontSize: '16px', clip: 'auto'
+      }, opts.style || {}),
+      _sel: opts.sel || [],
+      getBoundingClientRect() { return this._rect; },
+      getAttribute(k) { return this._attrs[k] ?? null; },
+      hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, k); },
+      matches(s) { return this._sel.includes(s); },
+      closest() { return null; },
+      querySelectorAll(s) { return opts.qsa?.[s] || []; },
+    };
+  }
+  let allEls = [];
+  if (mode === 'issues') {
+    const svg = makeEl('svg', {
+      attrs: { width: '16', height: '16' },
+      rect: { left: 12, right: 20, top: 12, bottom: 28, width: 8, height: 16 },
+      style: { display: 'block', width: '16px', height: '16px' },
+    });
+    const btn = makeEl('button', {
+      id: 'cta',
+      className: 'btn',
+      sel: ['button, [role="button"], input[type="submit"], input[type="button"], [data-ui-control]'],
+      rect: { left: 10, right: 110, top: 10, bottom: 42, width: 100, height: 32 },
+      scrollWidth: 140,
+      clientWidth: 100,
+      style: { display: 'inline-flex', overflowX: 'hidden', paddingLeft: '8px', paddingRight: '8px' },
+      qsa: { 'svg, img': [svg] },
+    });
+    const child = makeEl('div', { rect: { left: 0, right: 100, top: 0, bottom: 96, width: 100, height: 96 } });
+    const card = makeEl('div', {
+      id: 'card',
+      children: [child],
+      rect: { left: 0, right: 420, top: 0, bottom: 100, width: 420, height: 100 },
+      style: { display: 'block', paddingBottom: '16px', overflowY: 'hidden' },
+    });
+    child.parentElement = card;
+    const img = makeEl('img', {
+      attrs: { src: '/missing.png' },
+      complete: true,
+      naturalWidth: 0,
+      rect: { left: 10, right: 50, top: 10, bottom: 50, width: 40, height: 40 },
+    });
+    const tiny = makeEl('span', {
+      textContent: 'tiny label',
+      childNodes: [{ nodeType: 3, textContent: 'tiny label' }],
+      rect: { left: 10, right: 60, top: 10, bottom: 22, width: 50, height: 12 },
+      style: { display: 'inline', fontSize: '9px' },
+    });
+    const price = makeEl('span', {
+      className: 'price',
+      textContent: '99 ms',
+      childNodes: [{ nodeType: 3, textContent: '99 ms', _rects: [
+        { left: 10, right: 40, top: 10, bottom: 24, width: 30, height: 14 },
+        { left: 10, right: 30, top: 28, bottom: 42, width: 20, height: 14 },
+      ] }],
+      rect: { left: 10, right: 40, top: 10, bottom: 42, width: 30, height: 32 },
+      style: { display: 'inline-block' },
+    });
+    price.childNodes[0].parentElement = price;
+    allEls = [btn, svg, card, child, img, tiny, price];
+  }
+  const body = makeEl('body', { sel: ['html, body'], rect: { left: 0, right: 390, top: 0, bottom: 800, width: 390, height: 800 } });
+  const docEl = makeEl('html', {
+    sel: ['html, body'],
+    scrollWidth: mode === 'issues' ? 430 : 390,
+    clientWidth: 390,
+    rect: { left: 0, right: 390, top: 0, bottom: 800, width: 390, height: 800 },
+  });
+  global.window = { innerWidth: 390, innerHeight: 844 };
+  global.getComputedStyle = (el) => el._style;
+  global.document = {
+    documentElement: docEl,
+    body,
+    getAnimations: () => [],
+    createTreeWalker(root) {
+      const nodes = [];
+      for (const n of root.childNodes || []) if (n.nodeType === 3) nodes.push(n);
+      let idx = 0;
+      return { nextNode: () => (idx < nodes.length ? nodes[idx++] : null) };
+    },
+    createRange() {
+      let cur = null;
+      return {
+        selectNodeContents(n) { cur = n; },
+        getClientRects() { return (cur && cur._rects) || []; },
+      };
+    },
+    querySelectorAll(sel) {
+      if (sel === '*') return allEls;
+      if (sel === 'img') return allEls.filter((e) => e.tagName === 'IMG');
+      if (sel.includes('button')) return allEls.filter((e) => e.tagName === 'BUTTON');
+      if (sel.includes('.price')) return allEls.filter((e) => e.className.includes('price'));
+      return [];
+    },
+  };
+  return eval(code);
+}
+console.log(JSON.stringify({ empty: runCase('empty'), issues: runCase('issues') }));
+"""
+        run = subprocess.run([node_bin, "-e", harness, str(dom_audit)], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, msg=run.stderr or run.stdout)
+        out = json.loads(run.stdout)
+
+        expected_keys = {
+            "viewport", "checked", "counts", "status",
+            "horizontalOverflow", "controlIssues", "containerBottomClip",
+            "brokenImages", "smallText", "wrappedUnits", "note",
+        }
+        self.assertTrue(expected_keys.issubset(out["empty"].keys()))
+        self.assertEqual(out["empty"]["status"], "inconclusive")
+        self.assertEqual(out["empty"]["counts"]["total"], 0)
+
+        iss = out["issues"]
+        self.assertEqual(iss["status"], "issues")
+        self.assertGreaterEqual(iss["counts"]["horizontalOverflow"], 1)
+        self.assertGreaterEqual(iss["counts"]["controlIssues"], 1)
+        self.assertGreaterEqual(iss["counts"]["containerBottomClip"], 1)
+        self.assertGreaterEqual(iss["counts"]["brokenImages"], 1)
+        self.assertGreaterEqual(iss["counts"]["smallText"], 1)
+        self.assertGreaterEqual(iss["counts"]["wrappedUnits"], 1)
+
+
 
 if __name__ == "__main__":
     unittest.main()
