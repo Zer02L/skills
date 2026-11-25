@@ -1,0 +1,27 @@
+{
+  "prompts": [
+    {"query": "найди узкие места в этом python сервисе, API отвечает по 4 секунды", "should_trigger": true},
+    {"query": "почему тормозит этот SQL запрос и как оптимизировать выборку из orders", "should_trigger": true},
+    {"query": "проведи аудит производительности нашего FastAPI бэкенда и предложи оптимизации", "should_trigger": true},
+    {"query": "сборка vite + ci pipeline идёт 18 минут, разберись где bottleneck", "should_trigger": true},
+    {"query": "реакт таблица жутко лагает и фризит при скролле, найди причину", "should_trigger": true},
+    {"query": "профайлинг потребления памяти и cpu в скрипте парсинга, падает по OOM", "should_trigger": true},
+    {"query": "используй bottleneck-audit для проверки src/api/", "should_trigger": true},
+    {"query": "find performance bottlenecks in our checkout API and explain why p95 latency spiked", "should_trigger": true},
+    {"query": "why is this SQL query so slow and causing N+1 queries on the dashboard?", "should_trigger": true},
+    {"query": "profile CPU and memory usage of this Python worker and suggest optimizations", "should_trigger": true},
+    {"query": "our Next.js bundle and CI build time doubled last month, diagnose what's slowing it down", "should_trigger": true},
+    {"query": "diagnose why this Node.js endpoint blocks the event loop under load", "should_trigger": true},
+    {"query": "напиши новый скилл или оптимизируй существующий SKILL.md под бюджет токенов", "should_trigger": false},
+    {"query": "audit and refactor this skill to cut token overhead", "should_trigger": false},
+    {"query": "улучши плавность анимаций и spring-переходы в карточках меню", "should_trigger": false},
+    {"query": "improve the animations and make this modal feel smoother", "should_trigger": false},
+    {"query": "отрефактори архитектуру модуля авторизации без смены поведения, код слишком запутанный", "should_trigger": false},
+    {"query": "refactor the billing module for cleaner dependency injection", "should_trigger": false},
+    {"query": "создай SQL миграцию для новой таблицы invoices с внешним ключом на users", "should_trigger": false},
+    {"query": "почини баг: POST /orders возвращает 500 при пустом массиве items", "should_trigger": false},
+    {"query": "deploy existing skills to codex via manage-skills", "should_trigger": false},
+    {"query": "объясни теоретически как устроены B-tree индексы в PostgreSQL", "should_trigger": false}
+  ],
+  "shell": []
+}
