@@ -1,0 +1,30 @@
+{
+  "prompts": [
+    {"query": "Create a mobile login screen in figcraft and export preview.png", "should_trigger": true},
+    {"query": "inspect-code on dashboard.figcraft using figcraft-cli", "should_trigger": true},
+    {"query": "проверь команды figcraft_cli для создания переменных", "should_trigger": true},
+    {"query": "настрой права flatpak для ai.storyteller.figcraft", "should_trigger": true},
+    {"query": "конвертируй файл design/home.fig в svg", "should_trigger": true},
+    {"query": "export all frames from wireframe.penpot to pdf", "should_trigger": true},
+    {"query": "import mockup/landing.sketch and inspect layers", "should_trigger": true},
+    {"query": "собери UI-прототип в ui-kit.figcraft с auto-layout", "should_trigger": true},
+    {"query": "build a manual React SVG icon component without design tools", "should_trigger": false},
+    {"query": "fetch components from the Figma REST API using personal access token", "should_trigger": false},
+    {"query": "update flatpak manifest permissions for org.gnome.Builder", "should_trigger": false},
+    {"query": "check figure 2 in docs/report.md for layout spacing", "should_trigger": false},
+    {"query": "export the architecture diagram from diagram.svg to png", "should_trigger": false},
+    {"query": "sketch out the database schema and REST endpoints before coding", "should_trigger": false}
+  ],
+  "shell": [
+    {"command": "flatpak run ai.storyteller.figcraft", "should_deny": true},
+    {"command": "flatpak run --command=figcraft-cli ai.storyteller.figcraft info a.figcraft", "should_deny": true},
+    {"command": "figcraft-cli commands", "should_deny": true},
+    {"command": "figcraft-cli commands --json | head", "should_deny": true},
+    {"command": "scripts/fc.sh run --out card.figcraft", "should_deny": false},
+    {"command": "scripts/fc.sh lookup 'auto layout' --limit 10", "should_deny": false},
+    {"command": "figcraft-cli commands --json --filter layout", "should_deny": false},
+    {"command": "flatpak info ai.storyteller.figcraft", "should_deny": false},
+    {"command": "echo 'use fc.sh instead of flatpak run ai.storyteller.figcraft'", "should_deny": false},
+    {"command": "flatpak run org.mozilla.firefox", "should_deny": false}
+  ]
+}

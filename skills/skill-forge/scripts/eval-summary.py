@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import math
 import statistics
 import sys
 from datetime import datetime, timezone
@@ -30,13 +29,16 @@ def load_iteration(iter_dir: Path) -> dict[str, list[dict[str, Any]]]:
         if meta_file.is_file():
             try:
                 eval_name = json.loads(meta_file.read_text(encoding="utf-8")).get("eval_name") or eval_dir.name
-            except Exception:
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 pass
         for cfg_dir in sorted(p for p in eval_dir.iterdir() if p.is_dir() and not p.name.startswith(".")):
             grading_file = cfg_dir / "grading.json"
             if not grading_file.is_file():
                 continue
-            grading = json.loads(grading_file.read_text(encoding="utf-8"))
+            try:
+                grading = json.loads(grading_file.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Invalid JSON in {grading_file}: {exc}") from exc
             exps = grading.get("expectations") or []
             passed_cnt = sum(1 for e in exps if e.get("passed") is True)
             total_cnt = len(exps)
@@ -46,7 +48,10 @@ def load_iteration(iter_dir: Path) -> dict[str, list[dict[str, Any]]]:
             duration_s = None
             tokens = None
             if timing_file.is_file():
-                tdata = json.loads(timing_file.read_text(encoding="utf-8"))
+                try:
+                    tdata = json.loads(timing_file.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError(f"Invalid JSON in {timing_file}: {exc}") from exc
                 if "duration_ms" in tdata and isinstance(tdata["duration_ms"], (int, float)):
                     duration_s = tdata["duration_ms"] / 1000.0
                 elif "total_duration_seconds" in tdata and isinstance(tdata["total_duration_seconds"], (int, float)):
@@ -181,110 +186,36 @@ def render_html(bench: dict[str, Any]) -> str:
                 f"</div>"
             )
 
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>Eval Report: {html.escape(bench['skill_name'])}</title>
-<style>
-  body {{ font-family: system-ui, sans-serif; margin: 24px auto; max-width: 960px; padding: 0 16px 80px 16px; color: #111827; background: #f9fafb; }}
-  h1 {{ font-size: 20px; margin-bottom: 12px; }}
-  table {{ width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; margin-bottom: 20px; }}
-  th, td {{ text-align: left; padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }}
-  .card {{ background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }}
-  .card h3 {{ margin: 0 0 10px; font-size: 15px; }}
-  ul {{ margin: 0; padding-left: 18px; }}
-  li {{ margin-bottom: 8px; font-size: 13.5px; }}
-  .badge {{ display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }}
-  .pass {{ background: #dcfce7; color: #166534; }}
-  .fail {{ background: #fee2e2; color: #991b1b; }}
-  .ev {{ color: #4b5563; font-size: 12.5px; margin-top: 2px; }}
-  .review-box {{ margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e5e7eb; }}
-  .review-box label {{ font-size: 12px; font-weight: 600; color: #4b5563; display: block; margin-bottom: 4px; }}
-  .review-input, #overall-feedback {{ width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 48px; }}
-  .actions-panel {{ position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; padding: 12px 20px; box-shadow: 0 -4px 12px rgba(0,0,0,0.05); display: flex; gap: 12px; justify-content: center; align-items: center; z-index: 100; }}
-  .btn {{ font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }}
-  .btn-primary {{ background: #2563eb; color: #fff; }}
-  .btn-primary:hover {{ background: #1d4ed8; }}
-  .btn-secondary {{ background: #f3f4f6; color: #374151; border-color: #d1d5db; }}
-  .btn-secondary:hover {{ background: #e5e7eb; }}
-  .toast {{ font-size: 13px; color: #059669; font-weight: 600; margin-left: 8px; opacity: 0; transition: opacity 0.2s; }}
-  .toast.show {{ opacity: 1; }}
-</style>
-</head>
-<body>
-  <h1>Eval Report: {html.escape(bench['skill_name'])} ({html.escape(bench['iteration'])})</h1>
-  <table>
-    <thead><tr><th>Config</th><th>Runs</th><th>Pass Rate</th><th>Duration</th><th>Tokens</th></tr></thead>
-    <tbody>{''.join(summary_rows)}</tbody>
-  </table>
-  {''.join(eval_cards)}
+    delta_banner = ""
+    if "delta" in bench["run_summary"]:
+        d = bench["run_summary"]["delta"]
+        pr_cls = "delta-pos" if d["pass_rate"] >= 0 else "delta-neg"
+        parts = [f"pass_rate <span class='{pr_cls}'>{d['pass_rate']:+.1%}</span>"]
+        if d["duration_seconds"] is not None:
+            dur_cls = "delta-pos" if d["duration_seconds"] <= 0 else "delta-neg"
+            parts.append(f"duration <span class='{dur_cls}'>{d['duration_seconds']:+.2f}s</span>")
+        if d["total_tokens"] is not None:
+            tok_cls = "delta-pos" if d["total_tokens"] <= 0 else "delta-neg"
+            parts.append(f"tokens <span class='{tok_cls}'>{d['total_tokens']:+.0f}</span>")
+        delta_banner = (
+            f"<div class='delta-banner'><strong>Delta (with_skill vs {html.escape(d['baseline'])}):</strong> "
+            + ", ".join(parts)
+            + "</div>"
+        )
 
-  <div class='card' style='margin-bottom: 40px;'>
-    <h3>Overall Synthesis & Next Iteration Goals</h3>
-    <textarea id='overall-feedback' placeholder='General guidance for revising the skill in the next iteration...'></textarea>
-  </div>
-
-  <div class='actions-panel'>
-    <button class='btn btn-primary' id='copy-btn' onclick='copyFeedback()'>📋 Copy Feedback for Agent</button>
-    <button class='btn btn-secondary' id='dl-btn' onclick='downloadFeedback()'>💾 Download feedback.json</button>
-    <span class='toast' id='toast'>Copied to clipboard!</span>
-  </div>
-
-<script>
-const SKILL_NAME = {json.dumps(bench['skill_name'])};
-const ITERATION = {json.dumps(bench['iteration'])};
-
-function collectData() {{
-  const reviews = [];
-  document.querySelectorAll('.card[data-run-id]').forEach(card => {{
-    const runId = card.getAttribute('data-run-id');
-    const evalName = card.getAttribute('data-eval-name');
-    const cfg = card.getAttribute('data-cfg');
-    const text = (card.querySelector('.review-input')?.value || '').trim();
-    if (text) {{
-      reviews.push({{ run_id: runId, eval_name: evalName, config: cfg, feedback: text }});
-    }}
-  }});
-  const overall = (document.getElementById('overall-feedback')?.value || '').trim();
-  return {{ skill_name: SKILL_NAME, iteration: ITERATION, overall_feedback: overall, reviews: reviews }};
-}}
-
-function copyFeedback() {{
-  const data = collectData();
-  let md = `## Human Evaluation Feedback (${{data.skill_name}} - ${{data.iteration}})\\n\\n`;
-  if (data.overall_feedback) {{
-    md += `**Overall Direction:**\\n${{data.overall_feedback}}\\n\\n`;
-  }}
-  if (data.reviews.length > 0) {{
-    md += `### Per-Case Feedback:\\n`;
-    for (const r of data.reviews) {{
-      md += `- **${{r.eval_name}}** (${{r.config}}): ${{r.feedback}}\\n`;
-    }}
-  }} else {{
-    md += `*(No specific per-case complaints noted - outputs meet expectations)*\\n`;
-  }}
-  navigator.clipboard.writeText(md).then(() => {{
-    const t = document.getElementById('toast');
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2000);
-  }}).catch(err => alert('Could not copy: ' + err));
-}}
-
-function downloadFeedback() {{
-  const data = collectData();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {{ type: 'application/json' }});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `feedback-${{data.skill_name}}-${{data.iteration}}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}}
-</script>
-</body>
-</html>
-"""
+    tpl_path = Path(__file__).resolve().parent.parent / "assets" / "report.html"
+    template = tpl_path.read_text(encoding="utf-8")
+    skill_json = json.dumps(bench["skill_name"]).replace("</", "<\\/")
+    iter_json = json.dumps(bench["iteration"]).replace("</", "<\\/")
+    return (
+        template.replace("__TITLE__", html.escape(bench["skill_name"]))
+        .replace("__ITERATION__", html.escape(bench["iteration"]))
+        .replace("__SUMMARY_ROWS__", "".join(summary_rows))
+        .replace("__DELTA_BANNER__", delta_banner)
+        .replace("__EVAL_CARDS__", "".join(eval_cards))
+        .replace("__SKILL_NAME_JSON__", skill_json)
+        .replace("__ITERATION_JSON__", iter_json)
+    )
 
 
 def main() -> int:

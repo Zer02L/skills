@@ -25,9 +25,18 @@ Before drafting instructions for a CLI, Flatpak, Docker, or REST-backed tool:
    - Run `scripts/audit-skill.py --strict <skill-dir>` to verify idle/active token budgets.
    - Measure actual before/after latency, payload bytes, and tool round-trips on a representative task.
 
-## 3. Authoring universal `hook-triggers.json`
+## 3. Structuring bundled scripts & assets (standalone portability)
 
-Add `hook-triggers.json` only when semantic triggering via `description` is insufficient or when specific shell commands must be blocked deterministically.
+Skills Manager copies each skill directory independently, and skills may be installed directly from a Git subdirectory URL:
+
+- **Zero repo-root imports or personal paths:** Never import from repo-root `scripts/` or `scripts/lib/`, and never hardcode local user home directories in `SKILL.md` or `scripts/`.
+- **Internal Python modules (`scripts/_*.py`):** When a skill script or rule catalog grows large, split shared schemas or rule tables into `scripts/_spec.py` or `scripts/_rules.py`. `audit-skill.py` automatically excludes `_*` files from CLI script counts and executable-bit checks while still auditing their portability.
+- **Avoid heredoc Python & inline HTML/JS:** Do not embed multi-hundred-line Python inside `.sh` heredocs or large HTML/CSS/JS inside Python f-strings. Put implementation in `scripts/_impl.py` behind a thin 5-line `.sh` compatibility shim, and move templates into `assets/`.
+- **Test standalone copies:** Verify bundled scripts in a `TemporaryDirectory` via `shutil.copytree` outside the repository so missing internal imports or asset paths fail immediately.
+
+## 4. Authoring universal `hook-triggers.json`
+
+Add `hook-triggers.json` only when semantic triggering via `description` is insufficient or when specific shell commands must be blocked deterministically. Whenever `enabled` is `true`, include `evals/trigger-tests.json` (checked by `scripts/audit-skill.py` and `./scripts/check.py`).
 
 ### Portability rules (Python `re` + JS `RegExp`)
 
@@ -40,7 +49,7 @@ Because cross-agent hooks run in both Python (`skill-hook-router.py`) and JavaSc
 - **Always provide an escape hatch for `deny_shell`:** Use `"allow_if_regex"` when a wrapper script legitimately wraps or cites the guarded command, and mention `SKIP_SKILL_HOOKS=1` in `"reason"`.
 - **Always add near-miss tests** in `evals/trigger-tests.json` and run `scripts/test-triggers.py <skill-dir> --live-router --js-check` before syncing hooks.
 
-## 4. Designing trigger queries and near-misses
+## 5. Designing trigger queries and near-misses
 
 Whether tuning `description` or writing `evals/trigger-tests.json`:
 

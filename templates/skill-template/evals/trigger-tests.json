@@ -1,0 +1,7 @@
+{
+  "prompts": [
+    {"query": "use __SKILL_NAME__ on this project", "should_trigger": true},
+    {"query": "unrelated generic programming question", "should_trigger": false}
+  ],
+  "shell": []
+}

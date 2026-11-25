@@ -14,32 +14,33 @@ Create lean, measurable, cross-agent skills. Keep `SKILL.md` small, push determi
 2. **Probe (mandatory for CLI/tool skills):** Inspect the live binary before authoring rules — run `--help`, inspect sandbox mounts/permissions, check JSON schemas and unfiltered command-dump sizes, and measure baseline latency. Capture real syntax pitfalls so the skill prevents trial-and-error loops on day one.
 3. **Architect:** Split responsibilities deliberately across layers:
    - `SKILL.md` — concise workflow, exact non-obvious constraints, and minimal working example.
-   - `scripts/` — wrap multi-step boilerplate, auto-mount sandbox paths, batch calls, compact verbose JSON, and bound command lookups (`--limit`).
+   - `scripts/` — wrap multi-step boilerplate, auto-mount sandbox paths, batch calls, compact verbose JSON, and bound command lookups (`--limit`). Place internal helper modules in `scripts/_*.py` (excluded from CLI script count / executable checks); keep every skill 100% standalone (zero imports from repo-root `scripts/`).
    - `references/` — move long parameter catalogs, schemas, and optional setup guides out of `SKILL.md`.
+   - `assets/` — store HTML/CSS/JS templates and static output skeletons (e.g., `assets/report.html`) instead of embedding them in Python f-strings.
    - `hook-triggers.json` — add only when deterministic prompt routing or shell guardrails (`deny_shell`) prevent costly mistakes.
-4. **Author:** If working inside a skills repository, scaffold with its `scripts/new-skill.sh <name> [--with-scripts] [--with-references] [--with-hook]`. Explain *why* a rule exists instead of shouting `ALWAYS`/`NEVER`, generalize beyond individual test cases, and never hardcode local user/repo paths inside the skill folder.
+4. **Author:** In a skills repository, scaffold with `./scripts/new-skill.sh <name> [--with-scripts] [--with-references] [--with-assets] [--with-hook]` (`--with-hook` also scaffolds `evals/trigger-tests.json`). Explain *why* a rule exists instead of shouting `ALWAYS`/`NEVER`, generalize beyond individual test cases, avoid embedding large Python code inside bash heredocs (use `scripts/_*.py` + a thin `.sh` shim), and never hardcode local user/repo paths.
 5. **Test & Measure:**
-   - Run `scripts/audit-skill.py --strict <skill-dir>` to verify structure and token budget.
+   - Run `scripts/audit-skill.py --strict [--target-strict] <skill-dir>` to verify structure, relative links, standalone portability, and token budgets.
    - If `hook-triggers.json` + `evals/trigger-tests.json` exist, run `scripts/test-triggers.py <skill-dir> --live-router --js-check` to verify 100% pass across Python, JS, and hook adapters.
-   - Exercise every bundled script on real inputs and record actual before/after metrics (bytes/tokens, tool turns, runtime ms). For qualitative or behavioral skills, run cross-agent A/B evals using `references/eval-playbook.md` and `scripts/eval-summary.py`.
-6. **Ship & Hook:** In a skills repository, run `./scripts/validate.py --strict <name>`, preview with `./scripts/sync-to-manager.sh --dry-run <name> [--deploy <agent>] [--hooks]`, then sync and commit.
+   - Verify standalone portability from a copied temp directory outside the repo (and add `unittest` coverage in `tests/` when inside a skills repo). Exercise bundled scripts on real inputs and record actual before/after metrics; for qualitative skills, run cross-agent A/B evals using `references/eval-playbook.md` and `scripts/eval-summary.py`.
+6. **Ship & Hook:** In a skills repository, run `./scripts/check.py --require-js`, preview with `./scripts/sync-to-manager.sh --dry-run <name> [--deploy <agent>] [--hooks]`, then sync and commit.
 
-## 2. Hard token & quality budgets
+## 2. Token & quality budgets
 
-| Layer | Target budget | Why |
-| --- | --- | --- |
-| Frontmatter (idle) | <= 150 tokens | Loaded in every session; keep `description` trigger-rich and <= 1024 chars without `<` or `>` |
-| `SKILL.md` (active) | <= 1 500 tokens (<= 150 lines) | Keeps room for user code and tool outputs |
-| `references/*.md` | <= 2 500 tokens each | Loaded only when a specific subtask needs deep details |
-| `scripts/*` | Stdlib only, executable | Executed via shell (`0` prompt tokens until read); keep outputs compact |
+| Layer | Target (`--target-strict`) | Warn (`--strict`) | Why |
+| --- | --- | --- | --- |
+| Frontmatter (idle) | <= 150 tokens | <= 250 tokens | Loaded in every session; keep `description` trigger-rich and <= 1024 chars without `<` or `>` |
+| `SKILL.md` (active) | <= 1 500 tok (<= 150 L) | <= 2 000 tok (<= 500 L) | Keeps room for user code and tool outputs |
+| `references/*.md` | <= 2 500 tokens each | <= 3 500 tokens each | Loaded only when a specific subtask needs deep details |
+| `scripts/*` & `assets/*` | Stdlib only, standalone | Executable if shebang | Executed via shell (`0` prompt tokens until read); keep outputs compact |
 
 ## 3. Bundled tools (relative to this skill directory)
 
 | Script | Purpose |
 | --- | --- |
-| `scripts/audit-skill.py [--strict] [--json] <skill-dir>...` | Validate structure + `hook-triggers.json` JS portability and measure idle/active token budgets |
+| `scripts/audit-skill.py [--strict] [--target-strict] [--json] <skill-dir>...` | Validate structure, relative links, portability, `hook-triggers.json`, and token budgets |
 | `scripts/test-triggers.py [--live-router] [--js-check] <skill-dir>` | Test `evals/trigger-tests.json` (`should_trigger` / `should_not_trigger` / `deny_shell`) across Python, JS, and live router |
-| `scripts/eval-summary.py <iteration-dir> [--skill-name N] [--html OUT.html]` | Aggregate A/B `grading.json` + `timing.json` into `benchmark.json`, `benchmark.md`, and static HTML review report |
+| `scripts/eval-summary.py <iteration-dir> [--skill-name N] [--html OUT.html]` | Aggregate A/B `grading.json` + `timing.json` into `benchmark.json`, `benchmark.md`, and static HTML (`assets/report.html`) |
 
 ## 4. Progressive disclosure references
 

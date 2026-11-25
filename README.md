@@ -1,29 +1,44 @@
 # Репозиторий для создания скилов
 
-Локальный Git-репозиторий для разработки, валидации и синхронизации собственных агентских скилов с **Skills Manager** (`~/.skills-manager/bin/skills-manager-cli`).
+Локальный Git-репозиторий ([`Zer02L/skills`](https://github.com/Zer02L/skills)) для разработки, валидации, тестирования и синхронизации собственных агентских скилов со **Skills Manager** (`~/.skills-manager/bin/skills-manager-cli`).
+
+## Каталог скилов
+
+| Скил | Назначение | Скрипты | Авто-хук |
+| --- | --- | --- | --- |
+| [`bottleneck-audit`](skills/bottleneck-audit) | Диагностика узких мест (CPU, DB/SQL, I/O, память, бандл/CI) по закону Амдала | `scan-hotspots.py`, `bench-cmd.py` | `enabled` |
+| [`figcraft-flatpak`](skills/figcraft-flatpak) | Работа с `.figcraft`/`.fig`/`.penpot`/`.sketch` через Flatpak FigCraft без расхода токенов на дамп команд | `fc.sh` | `enabled` (`deny_shell=2`) |
+| [`skill-forge`](skills/skill-forge) | Мета-скил для проектирования, аудита токен-бюджетов и A/B-бенчмаркинга скилов | `audit-skill.py`, `test-triggers.py`, `eval-summary.py` | `enabled` |
 
 ## Структура
 
 ```text
 .
-├── skills/                     # Ваши скилы (по одной папке на скил)
+├── .github/workflows/ci.yml        # CI-проверка качества на push/PR
+├── skills/                         # Автономные скилы (по одной папке на скил)
 │   └── <skill-name>/
-│       ├── SKILL.md            # Обязательный файл инструкций с YAML frontmatter
-│       ├── scripts/            # (опционально) Исполняемые скрипты
-│       ├── references/         # (опционально) Справочные документы
-│       └── assets/             # (опционально) Шаблоны, ассеты
+│       ├── SKILL.md                # Обязательный манифест с YAML frontmatter
+│       ├── hook-triggers.json      # (опционально) Правила авто-хуков и deny_shell
+│       ├── evals/                  # (опционально) Наборы trigger-tests.json
+│       ├── scripts/                # (опционально) Исполняемые скрипты и _*.py-модули
+│       ├── references/             # (опционально) Справочники по требованию
+│       └── assets/                 # (опционально) Шаблоны и ассеты
 ├── templates/
 │   └── skill-template/
-│       ├── SKILL.md            # Стартовый шаблон для новых скилов
-│       └── hook-triggers.json  # Шаблон правил авто-хука (--with-hook)
+│       ├── SKILL.md                # Стартовый шаблон для новых скилов
+│       ├── hook-triggers.json      # Шаблон правил авто-хука (--with-hook)
+│       └── evals/trigger-tests.json
 ├── scripts/
-│   ├── new-skill.sh            # Создать заготовку нового скила
-│   ├── validate.py             # Проверить формат, имена, хуки и ограничения
-│   ├── sync-to-manager.sh      # Провалидировать и синхронизировать со Skills Manager
-│   ├── skill-hook-router.py    # Единый роутер хуков для всех агентов
-│   └── sync-hooks.py           # Установщик/проверка хуков в конфиги агентов
-├── AGENTS.md                   # Правила для AI-агентов в этом репозитории
-└── CLAUDE.md -> AGENTS.md      # Симлинк для Claude Code
+│   ├── check.py                    # Единый прогон: py_compile, validate, audit, triggers, unittest
+│   ├── new-skill.sh                # Создать заготовку нового скила (обёртка -> lib/scaffold.py)
+│   ├── validate.py                 # Проверить формат, имена, хуки и ограничения
+│   ├── sync-to-manager.sh          # Синхронизация со Skills Manager (обёртка -> lib/manager.py)
+│   ├── skill-hook-router.py        # Единый роутер хуков для всех CLI-агентов
+│   ├── sync-hooks.py               # Идемпотентный установщик хуков + OpenCode-плагин
+│   └── lib/                        # Внутренняя библиотека только для корневых скриптов
+├── tests/                          # Автотесты (stdlib unittest)
+├── AGENTS.md                       # Правила для AI-агентов в этом репозитории
+└── CLAUDE.md -> AGENTS.md          # Симлинк для Claude Code
 ```
 
 ## Ежедневный цикл разработки
@@ -32,19 +47,19 @@
 
 ```bash
 ./scripts/new-skill.sh my-skill
-# При необходимости сразу создать подпапки и шаблон авто-хука:
+# При необходимости сразу создать подпапки, авто-хук и заготовку evals/trigger-tests.json:
 ./scripts/new-skill.sh my-skill --with-scripts --with-references --with-assets --with-hook
 ```
 
 ### 2. Написать `skills/my-skill/SKILL.md`
 
-Опишите в YAML frontmatter `name` (должен совпадать с именем папки) и `description` (подробно укажите, что делает скил и в каких случаях он должен срабатывать; без `<` и `>`, до 1024 символов). Старайтесь держать `SKILL.md` короче 500 строк, а объёмные детали выносить в `references/`.
+Опишите в YAML frontmatter `name` (должен совпадать с именем папки) и `description` (подробно укажите, что делает скил и в каких случаях он должен срабатывать; без `<` и `>`, до 1024 символов). Держите `SKILL.md` компактным (ориентир из `skill-forge`: `<= 150` строк / `<= 1 500` токенов; жёсткое предупреждение на 500 строках), а объёмные детали выносите в `references/`.
 
-### 3. Проверить валидатором
+### 3. Проверить качество и тесты
 
 ```bash
-./scripts/validate.py            # проверить все скилы в skills/
-./scripts/validate.py --strict   # warnings (TODO: или >500 строк) тоже считаются ошибками
+./scripts/check.py --require-js  # полная проверка: compile + validate --strict + audit --strict + triggers + unittest
+./scripts/validate.py --strict   # только строгая валидация структуры и хуков
 ```
 
 ### 4. Синхронизировать со Skills Manager
@@ -70,7 +85,7 @@
 
 ## Универсальные хуки для автосрабатывания (`hook-triggers.json`)
 
-Если для скила нужно гарантированное срабатывание на промпт или блокировка неправильных CLI-команд, добавьте рядом с `SKILL.md` файл `hook-triggers.json` (или используйте `--with-hook` в `new-skill.sh`).
+Если для скила нужно гарантированное срабатывание на промпт или блокировка неправильных CLI-команд, добавьте рядом с `SKILL.md` файл `hook-triggers.json` и тесты `evals/trigger-tests.json` (создаются автоматически через `--with-hook` в `new-skill.sh`).
 
 - Проверить статус правил и агентов:
   ```bash
@@ -95,17 +110,13 @@
 
 Например: `claude_code`, `codex`, `gemini_cli`, `opencode`, `antigravity`, `deepseek_harness`.
 
-## Публикация на GitHub в отдельный репозиторий (по желанию)
+## Отслеживание скила напрямую из GitHub (по желанию)
 
-Бэкап-репозиторий `skills-manager-backup` хранит всю вашу библиотеку вместе со сторонними скилами и метаданными. Если позже захотите выложить **только свои скилы** в отдельный публичный или приватный репозиторий на GitHub:
+Репозиторий уже размещён в [`Zer02L/skills`](https://github.com/Zer02L/skills). Если захотите переключить источник конкретного скила в Skills Manager с локальной папки на GitHub (сохранив теги, пресеты и деплои):
 
-1. Создайте репозиторий и отправьте туда код:
-   ```bash
-   gh repo create skills --private --source=. --remote=origin --push
-   ```
-2. Переключите источник скила в Skills Manager на GitHub (теги, пресеты и деплои сохранятся):
-   ```bash
-   ~/.skills-manager/bin/skills-manager-cli skills set-source my-skill \
-     --git-url https://github.com/<ваш-логин>/skills/tree/main/skills/my-skill
-   ```
+```bash
+~/.skills-manager/bin/skills-manager-cli skills set-source my-skill \
+  --git-url https://github.com/Zer02L/skills/tree/main/skills/my-skill
+```
+
 После этого обновления скила можно будет подтягивать из GitHub командой `skills update my-skill` (после `git push`).

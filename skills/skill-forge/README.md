@@ -62,13 +62,16 @@ skills/skill-forge/
 ├── SKILL.md                       # Компактный манифест и 6-этапный рабочий процесс (≤ 150 строк)
 ├── README.md                      # Данный документ (сравнение с аналогами и концепция)
 ├── hook-triggers.json             # Правила авто-хука для universal skill-hook-router
+├── assets/
+│   └── report.html                # Автономный HTML/CSS/JS шаблон отчёта эвалов
 ├── references/
-│   ├── authoring-guide.md         # Руководство по стилю, Repeated Work Detection и near-misses
+│   ├── authoring-guide.md         # Правила текста, структура scripts/_*.py + assets/, regex для хуков
 │   └── eval-playbook.md           # Методология A/B тестирования, шаблоны судей (Grader, Comparator, Analyzer)
 ├── scripts/
-│   ├── audit-skill.py             # Аудит структуры и токен-бюджетов (stdlib Python 3)
+│   ├── _spec.py                   # Внутренний канонический парсер frontmatter и валидатор хуков
+│   ├── audit-skill.py             # Аудит структуры, портативности и токен-бюджетов (stdlib Python 3)
 │   ├── test-triggers.py           # Проверка триггеров на Python re, JS RegExp и live router
-│   └── eval-summary.py            # Агрегатор A/B результатов в benchmark.json, benchmark.md и интерактивный HTML
+│   └── eval-summary.py            # Агрегатор A/B результатов в benchmark.json, benchmark.md и HTML
 └── evals/
     └── trigger-tests.json         # Набор положительных и near-miss тестов для skill-forge
 ```
@@ -76,12 +79,15 @@ skills/skill-forge/
 ## Быстрые команды
 
 ```bash
-# Проверить токен-бюджеты и структуру скила
-python3 skills/skill-forge/scripts/audit-skill.py --strict skills/skill-forge/
+# Проверить токен-бюджеты (включая жёсткие целевые лимиты), ссылки и автономность
+python3 skills/skill-forge/scripts/audit-skill.py --strict --target-strict skills/skill-forge/
 
 # Проверить качество триггеров и кросс-рантайм регулярных выражений
 python3 skills/skill-forge/scripts/test-triggers.py skills/skill-forge/ --live-router --js-check
 
 # Собрать отчёт по итерации эвалов с интерактивным полем для фидбека
 python3 skills/skill-forge/scripts/eval-summary.py <workspace>/iteration-1 --skill-name "my-skill" --html <workspace>/iteration-1/report.html
+
+# Единый quality gate всего репозитория (compile, validate, audit, triggers, unittest)
+./scripts/check.py --require-js
 ```

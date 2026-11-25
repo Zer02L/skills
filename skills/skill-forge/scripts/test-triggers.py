@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -88,20 +89,24 @@ def check_live_router(
 ) -> list[str]:
     failures: list[str] = []
     conv_id = f"skill-forge-test-{os.getpid()}"
-    state_file = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp") / "custom-skills-router-state.json"
 
-    def run_router(agent: str, event: str, payload: dict[str, Any]) -> dict[str, Any]:
-        p = subprocess.run(
-            ["python3", str(router), agent, event],
-            input=json.dumps(payload),
-            capture_output=True,
-            text=True,
-        )
-        if p.returncode != 0:
-            raise RuntimeError(f"{agent}/{event} exited {p.returncode}: {p.stderr}")
-        return json.loads(p.stdout)
+    with tempfile.TemporaryDirectory(prefix="skill-forge-router-") as tmp_runtime_dir:
+        env = dict(os.environ)
+        env["XDG_RUNTIME_DIR"] = tmp_runtime_dir
+        env.pop("SKIP_SKILL_HOOKS", None)
 
-    try:
+        def run_router(agent: str, event: str, payload: dict[str, Any]) -> dict[str, Any]:
+            p = subprocess.run(
+                ["python3", str(router), agent, event],
+                input=json.dumps(payload),
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if p.returncode != 0:
+                raise RuntimeError(f"{agent}/{event} exited {p.returncode}: {p.stderr}")
+            return json.loads(p.stdout)
+
         pos_prompt = next((t for t in prompts if t.get("should_trigger")), None)
         neg_prompt = next((t for t in prompts if not t.get("should_trigger")), None)
 
@@ -136,18 +141,21 @@ def check_live_router(
                 res = run_router(agent, event, payload_fn(neg_deny["command"]))
                 if "deny" in json.dumps(res):
                     failures.append(f"Live router {agent}/{event} falsely denied {neg_deny['command']!r}: {res}")
-    finally:
-        if state_file.is_file():
-            try:
-                entries = json.loads(state_file.read_text(encoding="utf-8"))
-                if isinstance(entries, list):
-                    cleaned = [x for x in entries if not str(x).startswith(f"{conv_id}")]
-                    if cleaned:
-                        state_file.write_text(json.dumps(cleaned), encoding="utf-8")
-                    else:
-                        state_file.unlink()
-            except Exception:
-                pass
+
+        for sc in shell_cases:
+            if sc is pos_deny or sc is neg_deny:
+                continue
+            res = run_router(
+                "claude_code",
+                "PreToolUse",
+                {"tool_name": "Bash", "tool_input": {"command": sc["command"]}},
+            )
+            denied = res.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
+            expected = bool(sc.get("should_deny"))
+            if denied != expected:
+                failures.append(
+                    f"Live router claude_code/PreToolUse shell mismatch for {sc['command']!r}: got={denied} expected={expected} ({res})"
+                )
 
     return failures
 
@@ -174,10 +182,32 @@ def main() -> int:
         print(f"Error: {test_file} not found.", file=sys.stderr)
         return 1
 
-    rule = json.loads(hook_file.read_text(encoding="utf-8"))
-    tests = json.loads(test_file.read_text(encoding="utf-8"))
+    try:
+        rule = json.loads(hook_file.read_text(encoding="utf-8"))
+        tests = json.loads(test_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        print(f"Error reading trigger/test JSON: {exc}", file=sys.stderr)
+        return 1
+
+    if not isinstance(tests, dict):
+        print(f"Error: {test_file} must contain a JSON object.", file=sys.stderr)
+        return 1
+    unknown_keys = set(tests.keys()) - {"prompts", "shell"}
+    if unknown_keys:
+        print(
+            f"Error: unknown key(s) in {test_file}: {', '.join(sorted(unknown_keys))}. Allowed: prompts, shell.",
+            file=sys.stderr,
+        )
+        return 1
     prompts = tests.get("prompts", [])
     shell_cases = tests.get("shell", [])
+    if not isinstance(prompts, list) or not isinstance(shell_cases, list):
+        print(f"Error: 'prompts' and 'shell' in {test_file} must be lists.", file=sys.stderr)
+        return 1
+    if len(prompts) + len(shell_cases) == 0:
+        print("Error: trigger-tests.json contains no test cases (empty prompts and shell).", file=sys.stderr)
+        return 1
+
     flags = re.IGNORECASE if rule.get("case_insensitive", True) else 0
 
     failures: list[str] = []

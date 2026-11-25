@@ -1,5 +1,7 @@
 # План архитектуры и разработки скила `skill-forge`
 
+> **Статус:** исторический проектный документ (ADR на момент первичной разработки). Актуальное устройство и файлы (`scripts/_spec.py`, `assets/report.html`, `scripts/check.py`, `tests/`) описаны в [`skills/skill-forge/SKILL.md`](../skills/skill-forge/SKILL.md) и [`skills/skill-forge/README.md`](../skills/skill-forge/README.md).
+
 Этот документ фиксирует проект решения для собственного мета-скила **создания, оптимизации, аудита и тестирования скилов** (`skills/skill-forge`), спроектированного поверх опыта создания `figcraft-flatpak`, универсальной системы хуков (`scripts/skill-hook-router.py`, `scripts/sync-hooks.py`) и анализа `anthropics/skills/skill-creator`.
 
 ---

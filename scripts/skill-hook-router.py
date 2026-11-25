@@ -3,12 +3,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -42,29 +40,43 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def rule_search_dirs(root: Path) -> list[Path]:
+    env_dirs = os.environ.get("SKILL_HOOKS_DIRS", "").strip()
+    if env_dirs:
+        return [Path(p).expanduser() for p in env_dirs.split(os.pathsep) if p.strip()]
+    return [root / "skills"]
+
+
 def load_rules(root: Path) -> list[dict[str, Any]]:
-    skills_dir = root / "skills"
-    if not skills_dir.is_dir():
-        return []
     rules: list[dict[str, Any]] = []
-    for path in sorted(skills_dir.glob("*/hook-triggers.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+    for skills_dir in rule_search_dirs(root):
+        if not skills_dir.is_dir():
             continue
-        if not isinstance(data, dict) or data.get("enabled") is not True:
-            continue
-        skill = data.get("skill") or path.parent.name
-        if not isinstance(skill, str) or not skill:
-            continue
-        data["_skill"] = skill
-        rules.append(data)
+        for path in sorted(skills_dir.glob("*/hook-triggers.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(data, dict) or data.get("enabled") is not True:
+                continue
+            skill = data.get("skill") or path.parent.name
+            if not isinstance(skill, str) or not skill:
+                continue
+            data["_skill"] = skill
+            data["_dir"] = path.parent
+            rules.append(data)
     return rules
 
 
-def resolve_skill_paths(skill_name: str, root: Path) -> tuple[Path, Path | None]:
+def resolve_skill_paths(
+    skill_name: str, root: Path, fallback_dir: Path | None = None
+) -> tuple[Path, Path | None]:
     sm_dir = Path.home() / ".skills-manager" / "skills" / skill_name
-    base = sm_dir if (sm_dir / "SKILL.md").is_file() else (root / "skills" / skill_name)
+    base = (
+        sm_dir
+        if (sm_dir / "SKILL.md").is_file()
+        else (fallback_dir or (root / "skills" / skill_name))
+    )
     skill_md = base / "SKILL.md"
     scripts_dir = base / "scripts"
     return skill_md, (scripts_dir if scripts_dir.is_dir() else None)
@@ -122,6 +134,9 @@ def dedup_state_path() -> Path:
 def seen_before(conv_id: str, prompt: str) -> bool:
     if not conv_id or not prompt:
         return False
+    import hashlib
+    import tempfile
+
     digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
     key = f"{conv_id}:{digest}"
     state_file = dedup_state_path()
@@ -215,7 +230,7 @@ def handle_prompt(agent: str, event: str, payload: dict[str, Any], root: Path) -
             continue
         skill = rule["_skill"]
         hint = str(rule.get("hint") or f"Use the `{skill}` skill.").strip()
-        skill_md, scripts_dir = resolve_skill_paths(skill, root)
+        skill_md, scripts_dir = resolve_skill_paths(skill, root, rule.get("_dir"))
         loc = f"SKILL.md: {skill_md}"
         if scripts_dir is not None:
             loc += f", scripts: {scripts_dir}"
@@ -243,11 +258,10 @@ def handle_tool(agent: str, event: str, payload: dict[str, Any], root: Path) -> 
     rules = load_rules(root)
     for rule in rules:
         deny_list = rule.get("deny_shell")
-        if not isinstance(deny_list, list):
+        if not isinstance(deny_list, list) or not deny_list:
             continue
         flags = re.IGNORECASE if rule.get("case_insensitive", True) else 0
         skill = rule["_skill"]
-        skill_md, _ = resolve_skill_paths(skill, root)
         for entry in deny_list:
             if not isinstance(entry, dict):
                 continue
@@ -262,6 +276,7 @@ def handle_tool(agent: str, event: str, payload: dict[str, Any], root: Path) -> 
                     continue
             except re.error:
                 continue
+            skill_md, _ = resolve_skill_paths(skill, root, rule.get("_dir"))
             reason = str(entry.get("reason") or f"Blocked by `{skill}` skill hook.").strip()
             return format_deny_response(agent, event, f"{reason} [Skill: {skill_md}]")
 

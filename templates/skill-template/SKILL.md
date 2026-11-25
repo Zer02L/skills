@@ -21,7 +21,7 @@ description: >-
 ## Rules
 
 - Keep instructions concrete, imperative, and focused on non-obvious constraints.
-- Keep `SKILL.md` concise (ideally under 500 lines) and move bulky details into `references/`.
+- Keep `SKILL.md` concise (target <= 150 lines / <= 1 500 tokens; hard warning at 500 lines) and move bulky details into `references/`.
 
 ## Resources
 
